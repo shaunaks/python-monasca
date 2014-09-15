@@ -72,6 +72,7 @@ class ESConnection(object):
         if self.drop_data:
             return
         else:
+            msg = json.loads(msg)
             day = msg.get(self.time_id)
             if not day:
                 day = datetime.datetime.now(0)
@@ -79,6 +80,6 @@ class ESConnection(object):
             index = self._index_strategy.get_index(day)
             path = '%s%s%s/%s' % (self.uri, self.index_prefix, index,
                                   self.doc_type)
-            LOG.debug('THe post path:', path)
+            LOG.debug('The post path:' + path)
             res = requests.post(path, data=json.dumps(msg))
-            LOG.debug('The response is:', res)
+            LOG.debug(res)

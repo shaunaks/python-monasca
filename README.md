@@ -19,7 +19,7 @@ located::
 Once the configurations are modified to match your environment, you can start
 up the server by following the following instructions.
 
-To start the server, run the following command:
+To start the api server, run the following command:
 
     Running the server in foreground mode
     gunicorn -k eventlet --worker-connections=2000 --backlog=1000
@@ -28,6 +28,16 @@ To start the server, run the following command:
     Running the server as daemons
     gunicorn -k eventlet --worker-connections=2000 --backlog=1000
              --paste /etc/monasca/monasca.ini -D
+
+To start the collector server, run the following command
+
+    monasca-collector --config-file /etc/monasca/monasca-collector.conf
+    
+    
+To start the monasca ui server, run the following command
+
+    gunicorn -k eventlet --worker-connections=100 --backlogs=100
+             --paste /etc/monasca/dashboard.conf
 
 To check if the code follows python coding style, run the following command
 from the root directory of this project

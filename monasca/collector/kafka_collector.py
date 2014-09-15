@@ -18,16 +18,10 @@
 from oslo.config import cfg
 
 from monasca.common import kafka_conn
+from monasca.common import es_conn
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
 from monasca import service
-
-cfg.CONF.register_opts(
-    [cfg.StrOpt('dispatcher', default='elastic',
-                help=('The name of the dispatcher for the retrieved'
-                      'messages.')),
-     ], group="collector")
-
 
 LOG = log.getLogger(__name__)
 
@@ -37,12 +31,16 @@ class KafkaCollector(os_service.Service):
     def __init__(self, threads=1000):
         super(KafkaCollector, self).__init__(threads)
         self._kafka_conn = kafka_conn.KafkaConnection()
+        self._es_conn = es_conn.ESConnection()
 
     def start(self):
         while True:
             try:
                 for message in self._kafka_conn.get_messages():
                     LOG.debug(message.message.value)
+                    self._es_conn.send_messages(message.message.value)
+                # if autocommit is set, this will be a no-op call.
+                self._kafka_conn.commit()
             except Exception:
                 LOG.exception('Error occurred while handling kafka messages.')
 

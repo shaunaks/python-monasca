@@ -15,6 +15,7 @@
 # under the License.
 
 
+import datetime
 import StringIO
 try:
     import ujson as json
@@ -38,7 +39,21 @@ class MetricValidator(object):
     def _is_valid_metric(self, metric):
         """Validate a message
 
-        The current valid message format is as follows:
+        The external message format is
+        {
+           "name":"name1",
+           "dimensions":{
+              "key1":"value1",
+              "key2":"value2"
+           },
+           "timestamp":1405630174,
+           "value":1.0
+        }
+
+        Once this is validated, the message needs to be transformed into
+        the following internal format:
+
+        The current valid message format is as follows (interna):
         {
             "metric": {"something": "The metric as a JSON object"},
             "meta": {
@@ -46,24 +61,23 @@ class MetricValidator(object):
                 "region": "the region that the metric was submitted under",
             },
             "creation_time": "the time when the API received the metric",
-            "value": "some value"
         }
         """
-        if (metric.get('metric') and metric.get('meta') and
-                metric.get('creation_time') and metric.get('value')):
+        if (metric.get('name') and metric.get('dimensions') and
+                metric.get('timestamp') and metric.get('value')):
             return True
         else:
             return False
 
-    def __call__(self, environ, start_response):
+    def __call__(self, env, start_response):
         # if request starts with /datapoints/, then let it go on.
         # this login middle
-        if (environ.get('PATH_INFO', '').startswith('/v2.0/metrics') and
-                environ.get('REQUEST_METHOD', '') == 'POST'):
+        if (env.get('PATH_INFO', '').startswith('/v2.0/metrics') and
+                env.get('REQUEST_METHOD', '') == 'POST'):
             # We only check the requests which are posting against metrics
             # endpoint
             try:
-                body = environ['wsgi.input'].read()
+                body = env['wsgi.input'].read()
                 metrics = json.loads(body)
                 # Do business logic validation here.
                 is_valid = True
@@ -76,8 +90,22 @@ class MetricValidator(object):
                     is_valid = self._is_valid_metric(metrics)
 
                 if is_valid:
-                    environ['wsgi.input'] = StringIO.StringIO(body)
-                    return self.app(environ, start_response)
+                    # If the message is valid, then wrap it into this internal
+                    # format. The tenantId should be available from the
+                    # request since this should have been authenticated.
+                    # ideally this transformation should be done somewhere
+                    # else. For the sake of simplicity, do the simple one
+                    # here to make the life a bit easier.
+
+                    # TODO(HP) Add logic to get region id from request header
+                    # HTTP_X_SERVICE_CATALOG, then find endpoints, then region
+                    region_id = None
+                    msg = {'metric': metrics,
+                           'meta': {'tenantId': env.get('HTTP_X_PROJECT_ID'),
+                                    'region': region_id},
+                           'creation_time': datetime.datetime.now()}
+                    env['wsgi.input'] = StringIO.StringIO(json.dumps(msg))
+                    return self.app(env, start_response)
             except Exception:
                 pass
             # It is either invalid or exceptioned out while parsing json
@@ -86,7 +114,7 @@ class MetricValidator(object):
             return []
         else:
             # not a metric post request, move on.
-            return self.app(environ, start_response)
+            return self.app(env, start_response)
 
 
 def filter_factory(global_conf, **local_conf):
