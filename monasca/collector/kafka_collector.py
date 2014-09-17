@@ -15,10 +15,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from oslo.config import cfg
-
-from monasca.common import kafka_conn
 from monasca.common import es_conn
+from monasca.common import kafka_conn
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
 from monasca import service

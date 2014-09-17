@@ -75,13 +75,13 @@ class IndexStrategy(object):
                 a_date = datetime.datetime.fromtimestamp(a_date)
             except Exception:
                 return
-        elif isinstance(a_date, str):
+        elif isinstance(a_date, datetime.datetime):
+            pass
+        else:
             try:
-                a_date = dparser.parse(a_date, fuzzy=False)
+                a_date = dparser.parse(a_date, fuzzy=True)
             except Exception:
                 return
-        elif not isinstance(a_date, datetime.datetime):
-            return
 
         if self.time_unit is 'y':
             return "%04i0101000000" % a_date.year

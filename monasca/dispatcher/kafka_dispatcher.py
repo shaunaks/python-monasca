@@ -32,7 +32,7 @@ class KafkaDispatcher(monasca_api_v2.V2API):
 
         self._kafka_conn = kafka_conn.KafkaConnection()
 
-    @resource_api.Restify('/v2.0/metrics/', method='post')
+    @resource_api.Restify('/v2.0/datapoints/', method='post')
     def do_post_metrics(self, req, res):
         LOG.debug('Getting the call.')
         msg = req.stream.read()
