@@ -1,7 +1,6 @@
+# Copyright 2013 IBM Corp
 #
-# Copyright 2012-2013 eNovance <licensing@enovance.com>
-#
-# Author: Julien Danjou <julien@danjou.info>
+# Author: Tong Li <litong01@us.ibm.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -15,13 +14,15 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import time
+
 from kafka import client
 from kafka import common
 from kafka import consumer
 from kafka import producer
 from oslo.config import cfg
 from oslo.config import types
-import time
+
 try:
     import ujson as json
 except ImportError:
@@ -30,71 +31,59 @@ except ImportError:
 from monasca.openstack.common import log
 
 
-OPTS = [
-    cfg.StrOpt('uri',
-               help='Address to kafka server. For example: '
+kafka_opts = [
+    cfg.StrOpt('uri', help='Address to kafka server. For example: '
                'uri=192.168.1.191:9092'),
-    cfg.StrOpt('topic',
-               default='event',
-               help='The topic that this collector will listen on.'),
-    cfg.StrOpt('group',
-               default='event_consumer',
+    cfg.StrOpt('group', default='api',
                help='The group name that this service belongs to.'),
-    cfg.IntOpt('wait_time',
-               default=1,
+    cfg.IntOpt('wait_time', default=1,
                help='The wait time when no messages on kafka queue.'),
-    cfg.IntOpt('ack_time',
-               default=20,
+    cfg.IntOpt('ack_time', default=20,
                help='The ack time back to kafka.'),
-    cfg.IntOpt('max_retry',
-               default=3,
+    cfg.IntOpt('max_retry', default=3,
                help='The number of retry when there is a connection error.'),
-    cfg.BoolOpt('auto_commit',
-                default=False,
+    cfg.BoolOpt('auto_commit', default=False,
                 help='If automatically commmit when consume messages.'),
-    cfg.BoolOpt('async',
-                default=True,
-                help='The type of posting.'),
-    cfg.BoolOpt('compact',
-                default=True,
-                help=('Specify if the message received should be parsed.'
+    cfg.BoolOpt('async', default=True, help='The type of posting.'),
+    cfg.BoolOpt('compact', default=True,
+                help=('Specify if the message received should be parsed. '
                       'If True, message will not be parsed, otherwise '
                       'messages will be parsed.')),
-    cfg.MultiOpt('partitions',
-                 item_type=types.Integer(),
+    cfg.MultiOpt('partitions', item_type=types.Integer(),
                  default=[0],
                  help='The sleep time when no messages on kafka queue.'),
-    cfg.BoolOpt('drop_data',
-                default=False,
+    cfg.BoolOpt('drop_data', default=False,
                 help=('Specify if received data should be simply dropped. '
                       'This parameter is only for testing purposes.')),
 ]
 
-cfg.CONF.register_opts(OPTS, group="kafka")
+kafka_group = cfg.OptGroup(name='kafka_opts', title='title')
+cfg.CONF.register_group(kafka_group)
+cfg.CONF.register_opts(kafka_opts, kafka_group)
 
 LOG = log.getLogger(__name__)
 
 
 class KafkaConnection(object):
 
-    def __init__(self):
-        if not cfg.CONF.kafka.uri:
+    def __init__(self, topic):
+        if not cfg.CONF.kafka_opts.uri:
             raise Exception('Kafka is not configured correctly! '
                             'Use configuration file to specify Kafka '
                             'uri, for example: '
                             'uri=192.168.1.191:9092')
 
-        self.uri = cfg.CONF.kafka.uri
-        self.topic = cfg.CONF.kafka.topic
-        self.group = cfg.CONF.kafka.group
-        self.wait_time = cfg.CONF.kafka.wait_time
-        self.async = cfg.CONF.kafka.async
-        self.ack_time = cfg.CONF.kafka.ack_time
-        self.max_retry = cfg.CONF.kafka.max_retry
-        self.auto_commit = cfg.CONF.kafka.auto_commit
-        self.compact = cfg.CONF.kafka.compact
-        self.partitions = cfg.CONF.kafka.partitions
-        self.drop_data = cfg.CONF.kafka.drop_data
+        self.uri = cfg.CONF.kafka_opts.uri
+        self.topic = topic
+        self.group = cfg.CONF.kafka_opts.group
+        self.wait_time = cfg.CONF.kafka_opts.wait_time
+        self.async = cfg.CONF.kafka_opts.async
+        self.ack_time = cfg.CONF.kafka_opts.ack_time
+        self.max_retry = cfg.CONF.kafka_opts.max_retry
+        self.auto_commit = cfg.CONF.kafka_opts.auto_commit
+        self.compact = cfg.CONF.kafka_opts.compact
+        self.partitions = cfg.CONF.kafka_opts.partitions
+        self.drop_data = cfg.CONF.kafka_opts.drop_data
 
         self._client = None
         self._consumer = None

@@ -30,9 +30,6 @@ OPTS = [
     cfg.StrOpt('index_prefix',
                default='monasca_',
                help='The prefix for an index.'),
-    cfg.StrOpt('doc_type',
-               default='metrics',
-               help='The type of the data.'),
     cfg.StrOpt('time_id',
                default='timestamp',
                help='The type of the data.'),
@@ -49,7 +46,7 @@ LOG = log.getLogger(__name__)
 
 class ESConnection(object):
 
-    def __init__(self):
+    def __init__(self, doc_type):
         if not cfg.CONF.es.uri:
             raise Exception('ElasticSearch is not configured correctly! '
                             'Use configuration file to specify ElasticSearch '
@@ -60,7 +57,7 @@ class ESConnection(object):
         if self.uri.strip()[-1] != '/':
             self.uri += '/'
         self.index_prefix = cfg.CONF.es.index_prefix
-        self.doc_type = cfg.CONF.es.doc_type
+        self.doc_type = doc_type
         self.time_id = cfg.CONF.es.time_id
         self.drop_data = cfg.CONF.es.drop_data
 
@@ -80,4 +77,14 @@ class ESConnection(object):
             index = self._index_strategy.get_index(day)
             path = '%s%s%s/%s' % (self.uri, self.index_prefix, index,
                                   self.doc_type)
-            requests.post(path, data=json.dumps(msg))
+            LOG.debug('Msg posted path:%s, %s' % (path, json.dumps(msg)))
+            res = requests.post(path, data=json.dumps(msg))
+            LOG.debug('Msg posted with response code: %s' % res.status_code)
+
+    def get_messages(self, cond):
+        LOG.debug('Prepare to get messages.')
+        if cond:
+            path = '%s%s%*/%s/_search' % (self.uri, self.index_prefix,
+                                          self.doc_type)
+            LOG.debug('Search path:', path)
+            requests.post(path, data=json.dumps(cond))

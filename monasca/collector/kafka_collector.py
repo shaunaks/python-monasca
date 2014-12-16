@@ -15,11 +15,22 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+from oslo.config import cfg
+
 from monasca.common import es_conn
 from monasca.common import kafka_conn
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
 from monasca import service
+
+collector_opts = [
+    cfg.StrOpt('topic', default='metrics',
+               help='The topic that messages will be collected from.'),
+]
+
+collector_group = cfg.OptGroup(name='collector_opts', title='collector_opts')
+cfg.CONF.register_group(collector_group)
+cfg.CONF.register_opts(collector_opts, collector_group)
 
 LOG = log.getLogger(__name__)
 
@@ -28,8 +39,10 @@ class KafkaCollector(os_service.Service):
 
     def __init__(self, threads=1000):
         super(KafkaCollector, self).__init__(threads)
-        self._kafka_conn = kafka_conn.KafkaConnection()
-        self._es_conn = es_conn.ESConnection()
+        self._kafka_conn = kafka_conn.KafkaConnection(
+            cfg.CONF.collector_opts.topic)
+        self._es_conn = es_conn.ESConnection(
+            cfg.CONF.collector_opts.topic)
 
     def start(self):
         while True:
