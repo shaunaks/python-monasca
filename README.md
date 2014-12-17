@@ -46,6 +46,9 @@ To start the monasca ui server, run the following command
     gunicorn -k eventlet --worker-connections=100 --backlogs=100
              --paste /etc/monasca/dashboard.conf
 
+    the ElasticSearch Kibana has been changed. This section needs some
+    rework.
+
 To check if the code follows python coding style, run the following command
 from the root directory of this project
 
