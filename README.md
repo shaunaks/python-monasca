@@ -40,6 +40,13 @@ To start a monasca micro service server, run the following command:
 
     monasca-service --config-file /etc/monasca/monasca-persister.conf
 
+In the future, there might be other services such as threshold engine,
+anomaly detection, alarms etc. All these services should be able to take
+a specific configuration file to be launched. Here are the examples:
+
+    monasca-service --config-file /etc/monasca/monasca-alarms.conf
+    monasca-service --config-file /etc/monasca/monasca-anomaly.conf
+    monasca-service --config-file /etc/monasca/monasca-threshold.conf
 
 To start the monasca ui server, run the following command
 
