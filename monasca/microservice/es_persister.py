@@ -21,35 +21,38 @@ from monasca.common import es_conn
 from monasca.common import kafka_conn
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
-from monasca import service
 
-collector_opts = [
-    cfg.StrOpt('topic', default='metrics',
-               help='The topic that messages will be collected from.'),
+es_opts = [
+    cfg.StrOpt('topic',
+               default='metrics',
+               help=('The topic that messages will be retrieved from.'
+                     'This also will be used as a doc type when saved '
+                     'to ElasticSearch.')),
 ]
 
-collector_group = cfg.OptGroup(name='collector_opts', title='collector_opts')
-cfg.CONF.register_group(collector_group)
-cfg.CONF.register_opts(collector_opts, collector_group)
+es_group = cfg.OptGroup(name='es_persister', title='es_persister')
+cfg.CONF.register_group(es_group)
+cfg.CONF.register_opts(es_opts, es_group)
 
 LOG = log.getLogger(__name__)
 
 
-class KafkaCollector(os_service.Service):
+class ESPersister(os_service.Service):
 
     def __init__(self, threads=1000):
-        super(KafkaCollector, self).__init__(threads)
+        super(ESPersister, self).__init__(threads)
         self._kafka_conn = kafka_conn.KafkaConnection(
-            cfg.CONF.collector_opts.topic)
+            cfg.CONF.es_persister.topic)
         self._es_conn = es_conn.ESConnection(
-            cfg.CONF.collector_opts.topic)
+            cfg.CONF.es_persister.topic)
 
     def start(self):
         while True:
             try:
-                for message in self._kafka_conn.get_messages():
-                    LOG.debug(message.message.value)
-                    self._es_conn.send_messages(message.message.value)
+                for msg in self._kafka_conn.get_messages():
+                    if msg and msg.message:
+                        LOG.debug(msg.message.value)
+                        self._es_conn.send_messages(msg.message.value)
                 # if autocommit is set, this will be a no-op call.
                 self._kafka_conn.commit()
             except Exception:
@@ -57,11 +60,4 @@ class KafkaCollector(os_service.Service):
 
     def stop(self):
         self._kafka_conn.close()
-        super(KafkaCollector, self).stop()
-
-
-def main():
-    service.prepare_service()
-    launcher = os_service.ServiceLauncher()
-    launcher.launch_service(KafkaCollector())
-    launcher.wait()
+        super(ESPersister, self).stop()

@@ -42,7 +42,7 @@ kafka_opts = [
                help='The ack time back to kafka.'),
     cfg.IntOpt('max_retry', default=3,
                help='The number of retry when there is a connection error.'),
-    cfg.BoolOpt('auto_commit', default=False,
+    cfg.BoolOpt('auto_commit', default=True,
                 help='If automatically commmit when consume messages.'),
     cfg.BoolOpt('async', default=True, help='The type of posting.'),
     cfg.BoolOpt('compact', default=True,
@@ -164,9 +164,10 @@ class KafkaConnection(object):
             if not self._consumer:
                 self._init_consumer()
 
-            for message in self._consumer:
-                LOG.debug(message.message.value)
-                yield message
+            for msg in self._consumer:
+                if msg.message:
+                    LOG.debug(msg.message.value)
+                    yield msg
         except Exception:
             LOG.error('Error occurred while handling kafka messages.')
             self._consumer = None

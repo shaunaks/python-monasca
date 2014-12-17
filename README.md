@@ -29,11 +29,17 @@ To start the api server, run the following command:
     gunicorn -k eventlet --worker-connections=2000 --backlog=1000
              --paste /etc/monasca/monasca.ini -D
 
-To start the collector server, run the following command
+To start the monasca micro service servers, run the following command:
 
-    monasca-collector --config-file /etc/monasca/monasca-collector.conf
+    monasca-service --config-file /etc/monasca/monasca-xxxx.conf
+
+    where monasca-xxxx.conf file should be the micro service specific
+    configuration files. For example, to start the elasticsearch persister
+    micro service, run the command like this:
     
-    
+    monasca-service --config-file /etc/monasca/monasca-persister.conf
+
+
 To start the monasca ui server, run the following command
 
     gunicorn -k eventlet --worker-connections=100 --backlogs=100
@@ -43,7 +49,7 @@ To check if the code follows python coding style, run the following command
 from the root directory of this project
 
     tox -e pep8
-    
+
 To run all the unit test cases, run the following command from the root
 directory of this project
 
