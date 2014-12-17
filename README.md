@@ -29,14 +29,15 @@ To start the api server, run the following command:
     gunicorn -k eventlet --worker-connections=2000 --backlog=1000
              --paste /etc/monasca/monasca.ini -D
 
-To start the monasca micro service servers, run the following command:
+To start a monasca micro service server, run the following command:
 
     monasca-service --config-file /etc/monasca/monasca-xxxx.conf
 
-    where monasca-xxxx.conf file should be the micro service specific
-    configuration files. For example, to start the elasticsearch persister
-    micro service, run the command like this:
-    
+    where monasca-xxxx.conf should be a micro service specific
+    configuration file. For example, to start the ElasticSearch persister
+    micro service which read messages off of kafka queue and save the
+    messages onto ElasticSearch, run the following command:
+
     monasca-service --config-file /etc/monasca/monasca-persister.conf
 
 
