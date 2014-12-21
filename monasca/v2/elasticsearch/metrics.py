@@ -19,7 +19,6 @@ import falcon
 from oslo.config import cfg
 import requests
 
-from monasca.api import monasca_api_v2
 from monasca.common import es_conn
 from monasca.common import kafka_conn
 from monasca.common import resource_api
@@ -43,10 +42,10 @@ cfg.CONF.register_opts(metrics_opts, metrics_group)
 LOG = log.getLogger(__name__)
 
 
-class MetricDispatcher(monasca_api_v2.V2API):
+class MetricDispatcher(object):
     def __init__(self, global_conf):
         LOG.debug('initializing V2API!')
-        super(MetricDispatcher, self).__init__(global_conf)
+        super(MetricDispatcher, self).__init__()
         self._kafka_conn = kafka_conn.KafkaConnection(
             cfg.CONF.metrics.topic)
         self._es_conn = es_conn.ESConnection(
