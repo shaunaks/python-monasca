@@ -1,6 +1,13 @@
 {"_default_":
     {"dynamic_templates": 
-        [{"string_template":
+        [{"date_template":
+            {"match": "timestamp", 
+                "match_mapping_type": "date",
+                "mapping": 
+                    {"type": "date"}
+            }
+         },
+         {"string_template":
             {"match": "*", 
                 "match_mapping_type": "string",
                 "mapping": 

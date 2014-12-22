@@ -101,7 +101,7 @@ class TestMetricDispatcher(base.BaseTestCase):
         self.dispatcher._handle_req_name(req, body)
 
         self.assertEqual(body['query']['filtered']['filter']['bool']['must'],
-                         [{'term': {'name': 'tongli'}}])
+                         [{'prefix': {'name': 'tongli'}}])
 
     def test__handle_req_dimensions(self):
         req = mock.Mock()
@@ -160,3 +160,88 @@ class TestMetricDispatcher(base.BaseTestCase):
             self.dispatcher.do_post_metrics(mock.Mock(), res)
 
         self.assertEqual(getattr(falcon, 'HTTP_204'), res.status)
+
+    def test_do_get_measurements(self):
+        res = mock.Mock()
+        req = mock.Mock()
+
+        def _side_effect(arg):
+            if arg == 'name':
+                return 'tongli'
+            elif arg == 'dimensions':
+                return 'key1:100, key2:200'
+            elif arg == 'start_time':
+                return '2014-01-01'
+
+        req.get_param.side_effect = _side_effect
+
+        req_result = mock.Mock()
+        req_result.json.return_value = {"hits": {
+            "hits": [{"_id": "AUpwCGS81WoXEgZdOt7f",
+                      "_source": {"timestamp": "2014-12-21 22:26:45.951381",
+                                  "name": "BUIWRW",
+                                  "value": 0.0,
+                                  "dimensions": {"rkey0": 0, "key2": 0,
+                                                 "key1": 0}}},
+                     {"_id": "AUpwEcdA1WoXEgZdOuQH",
+                      "_source": {"timestamp": "2014-12-21 22:37:00.995311",
+                                  "name": "BUIWRW",
+                                  "value": 1.0,
+                                  "dimensions": {"rkey0": 0, "key2": 0,
+                                                 "key1": 0}}},
+                     {"_id": "AUpwEc9o1WoXEgZdOuV5",
+                      "_source": {"timestamp": "2014-12-21 22:37:03.083176",
+                                  "name": "BPQOZK",
+                                  "value": 0.0,
+                                  "dimensions": {"rkey0": 0, "key2": 0,
+                                                 "key1": 0}}},
+                     {"_id": "AUpwKV9f1WoXEgZdOv7_",
+                      "_source": {"timestamp": "2014-12-21 23:02:47.266393",
+                                  "name": "BRBIGN",
+                                  "value": 0.0,
+                                  "dimensions": {"rkey0": 0, "key2": 0,
+                                                 "key1": 0}}},
+                     {"_id": "AUpwKV901WoXEgZdOv8D",
+                      "_source": {"timestamp": "2014-12-21 23:02:47.287881",
+                                  "name": "BRBIGN",
+                                  "value": 10.0,
+                                  "dimensions": {"rkey0": 0, "key2": 0,
+                                                 "key1": 0}}},
+                     {"_id": "AUpwKV-61WoXEgZdOv8R",
+                      "_source": {"timestamp": "2014-12-21 23:02:47.354986",
+                                  "name": "BRBIGN", "value": 30.0,
+                                  "dimensions": {"rkey0": 0, "key2": 0,
+                                                 "key1": 0}}}]}}
+
+        req_result.status_code = 200
+
+        with mock.patch.object(requests, 'post', return_value=req_result):
+            self.dispatcher.do_get_measurements(req, res)
+
+        # test that the response code is 200
+        self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
+        obj = json.loads(res.stream)
+
+        # there should be total of 3 objects
+        self.assertEqual(len(obj), 3)
+
+        # the name should be BUIWRW, BPQOZK, BRBIGN
+        self.assertEqual(obj[0]['name'], 'BUIWRW')
+        self.assertEqual(obj[1]['name'], 'BPQOZK')
+        self.assertEqual(obj[2]['name'], 'BRBIGN')
+
+        self.assertEqual(obj[0]['dimensions'], {u'key1': 0, u'key2': 0,
+                                                u'rkey0': 0})
+        self.assertEqual(obj[0]['columns'], ["id", "timestamp", "value"])
+        self.assertEqual(obj[0]['measurements'],
+                         [['AUpwCGS81WoXEgZdOt7f',
+                           '2014-12-21 22:26:45.951381', 0.0],
+                          ['AUpwEcdA1WoXEgZdOuQH',
+                           '2014-12-21 22:37:00.995311', 1.0]])
+        self.assertEqual(obj[2]['measurements'],
+                         [['AUpwKV9f1WoXEgZdOv7_',
+                           '2014-12-21 23:02:47.266393', 0.0],
+                          ['AUpwKV901WoXEgZdOv8D',
+                           '2014-12-21 23:02:47.287881', 10.0],
+                          ['AUpwKV-61WoXEgZdOv8R',
+                           '2014-12-21 23:02:47.354986', 30.0]])

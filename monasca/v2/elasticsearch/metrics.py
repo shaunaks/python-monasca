@@ -33,6 +33,11 @@ except ImportError:
 metrics_opts = [
     cfg.StrOpt('topic', default='metrics',
                help='The topic that metrics will be published to.'),
+    cfg.IntOpt('size', default=10000,
+               help=('The query result limit. Any result set more than '
+                     'the limit will be discarded. To see all the matching '
+                     'result, narrow your search by using a small time '
+                     'window or strong matching name')),
 ]
 
 metrics_group = cfg.OptGroup(name='metrics', title='metrics')
@@ -46,14 +51,18 @@ class MetricDispatcher(object):
     def __init__(self, global_conf):
         LOG.debug('initializing V2API!')
         super(MetricDispatcher, self).__init__()
-        self._kafka_conn = kafka_conn.KafkaConnection(
-            cfg.CONF.metrics.topic)
-        self._es_conn = es_conn.ESConnection(
-            cfg.CONF.metrics.topic)
+        self.topic = cfg.CONF.metrics.topic
+        self.size = cfg.CONF.metrics.size
+        self._kafka_conn = kafka_conn.KafkaConnection(self.topic)
+        self._es_conn = es_conn.ESConnection(self.topic)
+
         # Setup the get metrics query body pattern
         self._query_body = {
             "query": {"filtered": {"filter": {"bool": {"must": []}}}},
-            "size": 0}
+            "size": self.size}
+
+        self._aggs_body = {}
+        self._sort_clause = []
 
         # Setup the get metrics query url, the url should be similar to this:
         # http://host:port/data_20141201/metrics/_search
@@ -87,15 +96,20 @@ class MetricDispatcher(object):
 
     def _make_agg_clause(self):
         if self._dim_props:
-            self._query_body['aggs'] = {
+            self._aggs_body = {
                 'name': {'terms': {'field': 'name'},
                          'aggs': {}}}
-            aggs = self._query_body['aggs']['name']['aggs']
+
+            self._sort_clause = [{'name': {'order': 'asc'}}]
+
+            aggs = self._aggs_body['name']['aggs']
             for prop in self._dim_props:
                 aggs[prop] = {'terms': {'field': 'dimensions.' + prop,
                                         'size': 0}}
                 aggs[prop]['aggs'] = {}
                 aggs = aggs[prop]['aggs']
+                self._sort_clause.append(
+                    {'dimensions.' + prop: {'order': 'asc'}})
 
     def post_data(self, req, res):
         LOG.debug('Getting the call.')
@@ -108,7 +122,13 @@ class MetricDispatcher(object):
         name = req.get_param('name')
         if name:
             body['query']['filtered']['filter']['bool']['must'].append(
-                {'term': {'name': name.strip()}})
+                {'prefix': {'name': name.strip()}})
+
+    def _handle_req_start_time(self, req, body):
+        start_time = req.get_param('start_time')
+        if start_time:
+            body['query']['filtered']['filter']['bool']['must'].append(
+                {'range': {'timestamp': {'gte': start_time.strip()}}})
 
     def _handle_req_dimensions(self, req, body):
         dimensions = req.get_param('dimensions')
@@ -134,11 +154,14 @@ class MetricDispatcher(object):
         body = copy.deepcopy(self._query_body)
         self._handle_req_name(req, body)
         self._handle_req_dimensions(req, body)
+        self._handle_req_start_time(req, body)
 
         # if there is no name or dimension, we do not need filter clause
         if not body['query']['filtered']['filter']['bool']['must']:
             del body['query']
 
+        # add aggregation clause
+        body['aggs'] = self._aggs_body
         es_res = requests.post(self._query_url, data=json.dumps(body))
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
@@ -175,7 +198,7 @@ class MetricDispatcher(object):
                         yield _fixup_obj(obj)
 
             res.stream = '[' + ''.join(_make_body({}, aggs)) + ']'
-            res.content_type = 'application/json'
+            res.content_type = 'application/json;charset=utf-8'
         else:
             res.stream = ''
 
@@ -185,7 +208,65 @@ class MetricDispatcher(object):
 
     @resource_api.Restify('/v2.0/metrics/measurements', method='get')
     def do_get_measurements(self, req, res):
-        res.status = getattr(falcon, 'HTTP_501')
+        LOG.debug('The metrics measurements GET request is received!')
+        body = copy.deepcopy(self._query_body)
+        self._handle_req_name(req, body)
+        self._handle_req_dimensions(req, body)
+        self._handle_req_start_time(req, body)
+
+        # if there is no name or dimension, we do not need filter clause
+        if not body['query']['filtered']['filter']['bool']['must']:
+            del body['query']
+
+        body['sort'] = self._sort_clause
+        es_res = requests.post(self._query_url, data=json.dumps(body))
+        res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
+
+        LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
+        if es_res.status_code == 200:
+            # convert the response into monasca metrics format
+            items = es_res.json()['hits']['hits']
+
+            flag = {'is_first': True}
+
+            obj_columns = ["id", "timestamp", "value"]
+
+            def _fixup_obj(obj, measures):
+                if not obj:
+                    return ''
+
+                target = obj
+                target['columns'] = obj_columns
+                target['measurements'] = measures
+                if flag['is_first']:
+                    flag['is_first'] = False
+                    return json.dumps(target)
+                else:
+                    return ',' + json.dumps(target)
+
+            def _make_body(items):
+                obj = {}
+                measures = []
+                for item in items:
+                    source = item['_source']
+                    new_obj = {'name': source['name'],
+                               'dimensions': source['dimensions']}
+                    if obj == new_obj:
+                        measures.append([item['_id'],
+                                         source['timestamp'],
+                                         source['value']])
+                    else:
+                        yield _fixup_obj(obj, measures)
+                        obj = new_obj
+                        measures = [[item['_id'],
+                                     source['timestamp'],
+                                     source['value']]]
+                yield _fixup_obj(obj, measures)
+
+            res.stream = '[' + ''.join(_make_body(items)) + ']'
+            res.content_type = 'application/json;charset=utf-8'
+        else:
+            res.stream = ''
 
     @resource_api.Restify('/v2.0/metrics/statistics', method='get')
     def do_get_statistics(self, req, res):

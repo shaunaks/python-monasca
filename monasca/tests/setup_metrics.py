@@ -46,9 +46,13 @@ def setup_metrics(argv):
         for j in range(10):
             MOLD['dimensions'] = {'key1': i * j, 'key2': j,
                                   'rkey%s' % j: j}
-            MOLD['timestamp'] = str(datetime.datetime.now())
-            MOLD['value'] = i * j * random.random()
+            # MOLD['timestamp'] = str(datetime.datetime.now())
+            # MOLD['value'] = i * j * random.random()
             requests.post(argv[1], data=json.dumps(MOLD))
+            for k in range(30):
+                MOLD['timestamp'] = str(datetime.datetime.now())
+                MOLD['value'] = i * j * k * random.random()
+                requests.post(argv[1], data=json.dumps(MOLD))
 
 
 if __name__ == '__main__':
