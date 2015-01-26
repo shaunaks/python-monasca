@@ -14,15 +14,17 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import copy
+import datetime
 import falcon
 from oslo.config import cfg
 import requests
+import time
 
 from monasca.common import es_conn
 from monasca.common import kafka_conn
 from monasca.common import resource_api
 from monasca.openstack.common import log
+from monasca.openstack.common import timeutils as tu
 
 try:
     import ujson as json
@@ -47,6 +49,81 @@ cfg.CONF.register_opts(metrics_opts, metrics_group)
 LOG = log.getLogger(__name__)
 
 
+class ParamUtil(object):
+
+    @staticmethod
+    def _default_st():
+        # default start time will be 30 days ago
+        return tu.utcnow() - datetime.timedelta(30)
+
+    @staticmethod
+    def _default_et():
+        # default end time will be current time
+        return tu.utcnow()
+
+    @staticmethod
+    def common(req, q):
+        # process metric name
+        name = req.get_param('name')
+        if name and name.strip():
+            q.append({'match': {'name': name.strip()}})
+
+        # handle start and end time
+        try:
+            st = req.get_param('start_time')
+            st = tu.parse_isotime(st) if st else ParamUtil._default_st()
+            st = st.timetuple()
+            et = req.get_param('end_time')
+            et = tu.parse_isotime(et) if et else ParamUtil._default_et()
+            et = et.timetuple()
+            q.append({'range': {'timestamp': {'lt': time.mktime(et),
+                                              'gte': time.mktime(st)}}})
+        except Exception:
+            return False
+
+        # handle dimensions
+        dimensions = req.get_param('dimensions')
+        matches = []
+
+        def _handle_pair(pair):
+            param = pair.split(':')
+            if len(param) == 2 and param[0] and param[1]:
+                key = param[0].strip()
+                value = param[1].strip()
+                # in case that the value is numeric
+                try:
+                    value = float(param[1].strip())
+                except Exception:
+                    # The value is not numeric, so use as is.
+                    pass
+                matches.append({'match': {'dimensions.' + key: value}})
+
+        if dimensions:
+            map(_handle_pair, dimensions.split(','))
+            q += matches
+
+        return True
+
+    @staticmethod
+    def period(req):
+        try:
+            if req.get_param('period'):
+                return str(int(req.get_param('period'))) + 's'
+        except Exception:
+            pass
+        return '300s'
+
+    @staticmethod
+    def stats(req):
+        try:
+            s = req.get_param('statistics')
+            if s:
+                return [x.strip() for x in s.lower().split(',')]
+        except Exception:
+            pass
+        return ['avg', 'count', 'max', 'min', 'sum']
+
+
 class MetricDispatcher(object):
     def __init__(self, global_conf):
         LOG.debug('initializing V2API!')
@@ -58,10 +135,11 @@ class MetricDispatcher(object):
 
         # Setup the get metrics query body pattern
         self._query_body = {
-            "query": {"filtered": {"filter": {"bool": {"must": []}}}},
+            "query": {"bool": {"must": []}},
             "size": self.size}
 
         self._aggs_body = {}
+        self._stats_body = {}
         self._sort_clause = []
 
         # Setup the get metrics query url, the url should be similar to this:
@@ -71,7 +149,7 @@ class MetricDispatcher(object):
         self._query_url = ''.join([self._es_conn.uri,
                                   self._es_conn.index_prefix, '*/',
                                   cfg.CONF.metrics.topic,
-                                  '/_search'])
+                                  '/_search?search_type=count'])
 
         # the url to get all the properties of metrics
         self._query_mapping_url = ''.join([self._es_conn.uri,
@@ -79,37 +157,34 @@ class MetricDispatcher(object):
                                            '*/_mappings/',
                                            cfg.CONF.metrics.topic])
 
-        self._dim_props = {}
-        self._get_dimension_keys()
-        self._make_agg_clause()
+        # Setup metrics query aggregation command. To see the structure of
+        # the aggregation, copy and paste it to a json formatter.
+        self._metrics_agg = """
+        {"by_name":{"terms":{"field":"name","size":%(size)d},
+        "aggs":{"by_dim":{"terms":{"field":"dimensions_hash","size":%(size)d},
+        "aggs":{"metrics":{"top_hits":{"_source":{"exclude":
+        ["dimensions_hash","timestamp","value"]},"size":1}}}}}}}
+        """
 
-    def _get_dimension_keys(self):
-        res = requests.get(self._query_mapping_url)
-        if res.status_code == 200:
-            for key in res.json():
-                mappings = res.json()[key]['mappings']
-                break
-            if mappings:
-                properties = mappings[cfg.CONF.metrics.topic]['properties']
-                if properties['dimensions']:
-                    self._dim_props = properties['dimensions']['properties']
+        self._measure_agg = """
+        {"by_name":{"terms":{"field":"name","size":%(size)d},
+        "aggs":{"by_dim":{"terms":{"field":"dimensions_hash",
+        "size": %(size)d},"aggs":{"dimension":{"top_hits":{
+        "_source":{"exclude":["dimensions_hash","timestamp",
+        "value"]},"size":1}},"measures": {"top_hits":{
+        "_source": {"include": ["timestamp", "value"]},
+        "sort": [{"timestamp": "asc"}],"size": %(size)d}}}}}}}
+        """
 
-    def _make_agg_clause(self):
-        if self._dim_props:
-            self._aggs_body = {
-                'name': {'terms': {'field': 'name'},
-                         'aggs': {}}}
-
-            self._sort_clause = [{'name': {'order': 'asc'}}]
-
-            aggs = self._aggs_body['name']['aggs']
-            for prop in self._dim_props:
-                aggs[prop] = {'terms': {'field': 'dimensions.' + prop,
-                                        'size': 0}}
-                aggs[prop]['aggs'] = {}
-                aggs = aggs[prop]['aggs']
-                self._sort_clause.append(
-                    {'dimensions.' + prop: {'order': 'asc'}})
+        self._stats_agg = """
+        {"by_name":{"terms":{"field":"name","size":%(size)d},
+        "aggs":{"by_dim":{"terms":{"field":"dimensions_hash",
+        "size":%(size)d},"aggs":{"dimension":{"top_hits":{"_source":
+        {"exclude":["dimensions_hash","timestamp","value"]},"size":1}},
+        "periods":{"date_histogram":{"field":"timestamp",
+        "interval":"%(period)s"},"aggs":{"statistics":{"stats":
+        {"field":"value"}}}}}}}}}
+        """
 
     def post_data(self, req, res):
         LOG.debug('Getting the call.')
@@ -118,86 +193,47 @@ class MetricDispatcher(object):
         code = self._kafka_conn.send_messages(msg)
         res.status = getattr(falcon, 'HTTP_' + str(code))
 
-    def _handle_req_name(self, req, body):
-        name = req.get_param('name')
-        if name:
-            body['query']['filtered']['filter']['bool']['must'].append(
-                {'prefix': {'name': name.strip()}})
-
-    def _handle_req_start_time(self, req, body):
-        start_time = req.get_param('start_time')
-        if start_time:
-            body['query']['filtered']['filter']['bool']['must'].append(
-                {'range': {'timestamp': {'gte': start_time.strip()}}})
-
-    def _handle_req_dimensions(self, req, body):
-        dimensions = req.get_param('dimensions')
-        if dimensions:
-            terms = []
-
-            def _handle_pair(pair):
-                param = pair.split(':')
-                if len(param) == 2 and param[0] and param[1]:
-                    key = param[0].strip()
-                    value = param[1].strip()
-                    try:
-                        value = float(param[1].strip)
-                    except Exception:
-                        pass
-                    terms.append({'term': {'dimensions.' + key: value}})
-            map(_handle_pair, dimensions.split(','))
-            body['query']['filtered']['filter']['bool']['must'] += terms
-
     @resource_api.Restify('/v2.0/metrics/', method='get')
     def do_get_metrics(self, req, res):
         LOG.debug('The metrics GET request is received!')
-        body = copy.deepcopy(self._query_body)
-        self._handle_req_name(req, body)
-        self._handle_req_dimensions(req, body)
-        self._handle_req_start_time(req, body)
 
-        # if there is no name or dimension, we do not need filter clause
-        if not body['query']['filtered']['filter']['bool']['must']:
-            del body['query']
+        # process query conditions
+        query = []
+        ParamUtil.common(req, query)
+        _metrics_ag = self._metrics_agg % {"size": self.size}
+        if query:
+            body = ('{"query":{"bool":{"must":' + json.dumps(query) + '}},'
+                    '"size":' + str(self.size) + ','
+                    '"aggs":' + _metrics_ag + '}')
+        else:
+            body = '{"aggs":' + _metrics_ag + '}'
 
-        # add aggregation clause
-        body['aggs'] = self._aggs_body
-        es_res = requests.post(self._query_url, data=json.dumps(body))
+        LOG.debug('Request body:' + body)
+        es_res = requests.post(self._query_url, data=body)
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
         LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
         if es_res.status_code == 200:
             # convert the response into monasca metrics format
-            aggs = es_res.json()['aggregations']
-
+            aggs = es_res.json()['aggregations']['by_name']['buckets']
             flag = {'is_first': True}
 
-            def _fixup_obj(obj):
-                target = {'name': obj['name']}
-                del obj['name']
-                target['dimensions'] = obj
+            def _render_hits(item):
+                rslt = item['metrics']['hits']['hits'][0]['_source']
                 if flag['is_first']:
                     flag['is_first'] = False
-                    return json.dumps(target)
+                    return json.dumps(rslt)
                 else:
-                    return ',' + json.dumps(target)
+                    return ',' + json.dumps(rslt)
 
-            def _make_body(obj, parent):
-                for key in parent:
-                    if key in ['key', 'doc_count']:
-                        continue
-                    if parent[key]['buckets']:
-                        for bucket in parent[key]['buckets']:
-                            new_obj = copy.deepcopy(obj)
-                            new_obj[key] = bucket['key']
-                            if bucket:
-                                yield ''.join(_make_body(new_obj, bucket))
-                            else:
-                                yield _fixup_obj(new_obj)
-                    else:
-                        yield _fixup_obj(obj)
+            def _make_body(buckets):
+                for by_name in buckets:
+                    if by_name['by_dim']:
+                        for by_dim in by_name['by_dim']['buckets']:
+                            yield _render_hits(by_dim)
+                yield ''
 
-            res.stream = '[' + ''.join(_make_body({}, aggs)) + ']'
+            res.stream = '[' + ''.join(_make_body(aggs)) + ']'
             res.content_type = 'application/json;charset=utf-8'
         else:
             res.stream = ''
@@ -209,65 +245,119 @@ class MetricDispatcher(object):
     @resource_api.Restify('/v2.0/metrics/measurements', method='get')
     def do_get_measurements(self, req, res):
         LOG.debug('The metrics measurements GET request is received!')
-        body = copy.deepcopy(self._query_body)
-        self._handle_req_name(req, body)
-        self._handle_req_dimensions(req, body)
-        self._handle_req_start_time(req, body)
+        # process query conditions
+        query = []
+        ParamUtil.common(req, query)
+        _measure_ag = self._measure_agg % {"size": self.size}
+        if query:
+            body = ('{"query":{"bool":{"must":' + json.dumps(query) + '}},'
+                    '"size":' + str(self.size) + ','
+                    '"aggs":' + _measure_ag + '}')
+        else:
+            body = '{"aggs":' + _measure_ag + '}'
 
-        # if there is no name or dimension, we do not need filter clause
-        if not body['query']['filtered']['filter']['bool']['must']:
-            del body['query']
-
-        body['sort'] = self._sort_clause
-        es_res = requests.post(self._query_url, data=json.dumps(body))
+        LOG.debug('Request body:' + body)
+        es_res = requests.post(self._query_url, data=body)
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
         LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
         if es_res.status_code == 200:
             # convert the response into monasca metrics format
-            items = es_res.json()['hits']['hits']
+            metrics = es_res.json()['aggregations']['by_name']['buckets']
 
-            flag = {'is_first': True}
-
-            obj_columns = ["id", "timestamp", "value"]
-
-            def _fixup_obj(obj, measures):
-                if not obj:
-                    return ''
-
-                target = obj
-                target['columns'] = obj_columns
-                target['measurements'] = measures
-                if flag['is_first']:
-                    flag['is_first'] = False
-                    return json.dumps(target)
-                else:
-                    return ',' + json.dumps(target)
+            def _render_metric(dim):
+                source = dim['dimension']['hits']['hits'][0]['_source']
+                yield '{"name":"' + source['name'] + '","dimensions":'
+                yield json.dumps(source['dimensions'])
+                yield ',"columns":["id","timestamp","value"],"measurements":['
+                is_first = True
+                for measure in dim['measures']['hits']['hits']:
+                    ss = measure['_source']
+                    m = ('["' + measure['_id'] + '","' +
+                         tu.iso8601_from_timestamp(ss['timestamp']) +
+                         '",' + str(ss['value']) + ']')
+                    if is_first:
+                        yield m
+                        is_first = False
+                    else:
+                        yield ',' + m
+                yield ']}'
 
             def _make_body(items):
-                obj = {}
-                measures = []
-                for item in items:
-                    source = item['_source']
-                    new_obj = {'name': source['name'],
-                               'dimensions': source['dimensions']}
-                    if obj == new_obj:
-                        measures.append([item['_id'],
-                                         source['timestamp'],
-                                         source['value']])
-                    else:
-                        yield _fixup_obj(obj, measures)
-                        obj = new_obj
-                        measures = [[item['_id'],
-                                     source['timestamp'],
-                                     source['value']]]
-                yield _fixup_obj(obj, measures)
+                is_first = True
+                for metric in items:
+                    for dim in metric['by_dim']['buckets']:
+                        if is_first:
+                            is_first = False
+                        else:
+                            yield ','
+                        for result in _render_metric(dim):
+                            yield result
 
-            res.stream = '[' + ''.join(_make_body(items)) + ']'
+            res.stream = '[' + ''.join(_make_body(metrics)) + ']'
             res.content_type = 'application/json;charset=utf-8'
         else:
             res.stream = ''
 
     @resource_api.Restify('/v2.0/metrics/statistics', method='get')
     def do_get_statistics(self, req, res):
-        res.status = getattr(falcon, 'HTTP_501')
+        # process query conditions
+        query = []
+        ParamUtil.common(req, query)
+        period = ParamUtil.period(req)
+        stats = ParamUtil.stats(req)
+
+        _stats_ag = self._stats_agg % {"size": self.size, "period": period}
+        if query:
+            body = ('{"query":{"bool":{"must":' + json.dumps(query) + '}},'
+                    '"size":' + str(self.size) + ','
+                    '"aggs":' + _stats_ag + '}')
+        else:
+            body = '{"aggs":' + _stats_ag + '}'
+
+        LOG.debug('Request body:' + body)
+        es_res = requests.post(self._query_url, data=body)
+        res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
+
+        LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
+        if es_res.status_code == 200:
+            # convert the response into monasca metrics format
+            aggs = es_res.json()['aggregations']['by_name']['buckets']
+
+            col_fields = ['timestamp'] + stats
+            col_json = json.dumps(col_fields)
+
+            def _render_stats(dim):
+                source = dim['dimension']['hits']['hits'][0]['_source']
+                yield '{"name":"' + source['name'] + '","dimensions":'
+                yield json.dumps(source['dimensions'])
+                yield ',"columns":' + col_json + ',"statistics":['
+                is_first = True
+                for item in dim['periods']['buckets']:
+                    m = ('["' + tu.iso8601_from_timestamp(item['key']) +
+                         '"')
+                    for s in stats:
+                        m += ',' + str(item['statistics'][s])
+                    m += ']'
+                    if is_first:
+                        yield m
+                        is_first = False
+                    else:
+                        yield ',' + m
+                yield ']}'
+
+            def _make_body(items):
+                is_first = True
+                for metric in items:
+                    for dim in metric['by_dim']['buckets']:
+                        if is_first:
+                            is_first = False
+                        else:
+                            yield ','
+                        for result in _render_stats(dim):
+                            yield result
+
+            res.stream = '[' + ''.join(_make_body(aggs)) + ']'
+            res.content_type = 'application/json;charset=utf-8'
+        else:
+            res.stream = ''

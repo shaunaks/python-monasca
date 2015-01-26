@@ -19,45 +19,65 @@
 # program parameter
 #
 #
-import datetime
+
+import hashlib
 import json
 import random
 import requests
 import string
 import sys
+import time
 
 
 MOLD = {"name": "name1",
-        "dimensions": {
-            "key1": "value1",
-            "key2": "value2"},
         "timestamp": '2014-12-01',
         "value": 100
         }
 
+MOLD_DIMENSIONS = {"key1": None}
+
 
 def setup_metrics(argv):
 
-    # Generate unique 100 metrics
-    for i in range(100):
-        name = ''.join(random.sample(string.ascii_uppercase * 6, 6))
-        MOLD['name'] = name
-        # Generate 10 metrics for each name
-        for j in range(10):
-            MOLD['dimensions'] = {'key1': i * j, 'key2': j,
-                                  'rkey%s' % j: j}
-            # MOLD['timestamp'] = str(datetime.datetime.now())
-            # MOLD['value'] = i * j * random.random()
-            requests.post(argv[1], data=json.dumps(MOLD))
-            for k in range(30):
-                MOLD['timestamp'] = str(datetime.datetime.now())
-                MOLD['value'] = i * j * k * random.random()
-                requests.post(argv[1], data=json.dumps(MOLD))
+    for a in range(100):
+        MOLD_DIMENSIONS['key1'] = (
+            ''.join(random.sample(string.ascii_uppercase * 6, 6)))
+        MOLD_DIMENSIONS['key2'] = (
+            ''.join(random.sample(string.ascii_uppercase * 6, 6)))
+        MOLD_DIMENSIONS['key_' + str(a)] = (
+            ''.join(random.sample(string.ascii_uppercase * 6, 6)))
 
+        key_str = json.dumps(MOLD_DIMENSIONS, sort_keys=True,
+                             indent=None,
+                             separators=(',', ':'))
+
+        key = hashlib.md5(key_str).hexdigest()
+
+        MOLD['dimensions'] = MOLD_DIMENSIONS
+        MOLD['dimensions_hash'] = key
+
+        print('starting round %s' % a)
+        # Generate unique 100 metrics
+        for i in range(100):
+            MOLD['name'] = ''.join(random.sample(string.ascii_uppercase * 6,
+                                                 6))
+
+            for j in range(10):
+                MOLD['value'] = round((i + 1) * j * random.random(), 2)
+                the_time = time.time()
+                for k in range(30):
+                    MOLD['timestamp'] = the_time + k * 5000
+                    MOLD['value'] = i * j * k * random.random()
+                    res = requests.post(argv[1], data=json.dumps(MOLD))
+                    if res.status_code != 201:
+                        print(json.dumps(MOLD))
+                        exit(0)
+        del MOLD_DIMENSIONS['key_' + str(a)]
+        print('round finished %s' % a)
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
         setup_metrics(sys.argv)
     else:
         print('Usage: setup_metrics endpoint. For example:')
-        print('       setup_metrics http://host:9000/v2.0/metrics')
+        print('       setup_metrics http://host:9000/data_2015')
