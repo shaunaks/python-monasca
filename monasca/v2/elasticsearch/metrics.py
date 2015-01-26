@@ -227,16 +227,17 @@ class MetricDispatcher(object):
                     return ',' + json.dumps(rslt)
 
             def _make_body(buckets):
+                yield '['
                 for by_name in buckets:
                     if by_name['by_dim']:
                         for by_dim in by_name['by_dim']['buckets']:
                             yield _render_hits(by_dim)
-                yield ''
+                yield ']'
 
-            res.stream = '[' + ''.join(_make_body(aggs)) + ']'
+            res.body = ''.join(_make_body(aggs))
             res.content_type = 'application/json;charset=utf-8'
         else:
-            res.stream = ''
+            res.body = ''
 
     @resource_api.Restify('/v2.0/metrics/', method='post')
     def do_post_metrics(self, req, res):
@@ -285,6 +286,7 @@ class MetricDispatcher(object):
 
             def _make_body(items):
                 is_first = True
+                yield '['
                 for metric in items:
                     for dim in metric['by_dim']['buckets']:
                         if is_first:
@@ -293,11 +295,12 @@ class MetricDispatcher(object):
                             yield ','
                         for result in _render_metric(dim):
                             yield result
+                yield ']'
 
-            res.stream = '[' + ''.join(_make_body(metrics)) + ']'
+            res.body = ''.join(_make_body(metrics))
             res.content_type = 'application/json;charset=utf-8'
         else:
-            res.stream = ''
+            res.body = ''
 
     @resource_api.Restify('/v2.0/metrics/statistics', method='get')
     def do_get_statistics(self, req, res):
@@ -315,7 +318,6 @@ class MetricDispatcher(object):
         else:
             body = '{"aggs":' + _stats_ag + '}'
 
-        LOG.debug('Request body:' + body)
         es_res = requests.post(self._query_url, data=body)
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
@@ -348,6 +350,7 @@ class MetricDispatcher(object):
 
             def _make_body(items):
                 is_first = True
+                yield '['
                 for metric in items:
                     for dim in metric['by_dim']['buckets']:
                         if is_first:
@@ -356,8 +359,9 @@ class MetricDispatcher(object):
                             yield ','
                         for result in _render_stats(dim):
                             yield result
+                yield ']'
 
-            res.stream = '[' + ''.join(_make_body(aggs)) + ']'
+            res.body = ''.join(_make_body(aggs))
             res.content_type = 'application/json;charset=utf-8'
         else:
-            res.stream = ''
+            res.body = ''

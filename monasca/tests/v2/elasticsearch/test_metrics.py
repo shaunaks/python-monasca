@@ -162,7 +162,7 @@ class TestMetricDispatcher(base.BaseTestCase):
 
         # test that the response code is 200
         self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
-        obj = json.loads(res.stream)
+        obj = json.loads(res.body)
         self.assertEqual(obj[0]['name'], 'BABMGD')
         self.assertEqual(obj[0]['dimensions']['key2'], 'NVITDU')
         self.assertEqual(len(obj), 2)
@@ -261,7 +261,7 @@ class TestMetricDispatcher(base.BaseTestCase):
 
         # test that the response code is 200
         self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
-        obj = json.loads(res.stream)
+        obj = json.loads(res.body)
 
         # there should be total of 3 objects
         self.assertEqual(len(obj), 3)
@@ -331,7 +331,7 @@ class TestMetricDispatcher(base.BaseTestCase):
 
         # test that the response code is 200
         self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
-        obj = json.loads(res.stream)
+        obj = json.loads(res.body)
         # there should be total of 2 objects
         self.assertEqual(len(obj), 2)
         self.assertIsNotNone(obj[0]['name'])
