@@ -62,6 +62,11 @@ class ESConnection(object):
         self.drop_data = cfg.CONF.es.drop_data
 
         self._index_strategy = strategy.IndexStrategy()
+
+        day = datetime.datetime.now()
+        index = self._index_strategy.get_index(day)
+        self.post_path = '%s%s%s/%s/_bulk' % (self.uri, self.index_prefix,
+                                              index, self.doc_type)
         LOG.debug('ElasticSearch Connection initialized successfully!')
 
     def send_messages(self, msg):
@@ -69,16 +74,7 @@ class ESConnection(object):
         if self.drop_data:
             return
         else:
-            msg = json.loads(msg)
-            day = msg.get(self.time_id)
-            if not day:
-                day = datetime.datetime.now()
-                msg[self.time_id] = day
-            index = self._index_strategy.get_index(day)
-            path = '%s%s%s/%s' % (self.uri, self.index_prefix, index,
-                                  self.doc_type)
-            LOG.debug('Msg posted path:%s, %s' % (path, json.dumps(msg)))
-            res = requests.post(path, data=json.dumps(msg))
+            res = requests.post(self.post_path, data=msg)
             LOG.debug('Msg posted with response code: %s' % res.status_code)
 
     def get_messages(self, cond):

@@ -16,11 +16,15 @@
 # under the License.
 
 from oslo.config import cfg
+from stevedore import driver
 
 from monasca.common import es_conn
 from monasca.common import kafka_conn
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
+
+
+PROCESSOR_NAMESPACE = 'monasca.message.processor'
 
 es_opts = [
     cfg.StrOpt('topic',
@@ -28,6 +32,11 @@ es_opts = [
                help=('The topic that messages will be retrieved from.'
                      'This also will be used as a doc type when saved '
                      'to ElasticSearch.')),
+    cfg.StrOpt('processor',
+               default='',
+               help=('The message processer to load to process the message.'
+                     'If the message does not need to be process anyway,'
+                     'leave the default')),
 ]
 
 es_group = cfg.OptGroup(name='es_persister', title='es_persister')
@@ -46,13 +55,28 @@ class ESPersister(os_service.Service):
         self._es_conn = es_conn.ESConnection(
             cfg.CONF.es_persister.topic)
 
+        if cfg.CONF.es_persister.processor:
+            self.msg_processor = driver.DriverManager(
+                PROCESSOR_NAMESPACE,
+                cfg.CONF.es_persister.processor,
+                invoke_on_load=True,
+                invoke_kwds={})
+            LOG.debug(dir(self.msg_processor.driver))
+        else:
+            self.msg_processor = None
+
     def start(self):
         while True:
             try:
                 for msg in self._kafka_conn.get_messages():
                     if msg and msg.message:
                         LOG.debug(msg.message.value)
-                        self._es_conn.send_messages(msg.message.value)
+                        if self.msg_processor:
+                            value = self.msg_processor.process_msg(
+                                msg.message.value)
+                        else:
+                            value = msg.message.value
+                        self._es_conn.send_messages(value)
                 # if autocommit is set, this will be a no-op call.
                 self._kafka_conn.commit()
             except Exception:
