@@ -33,7 +33,7 @@ class MetricsFixer(object):
     def _add_hash(message):
         # If there is no timestamp, we need to fix that up
         if not message.get('timestamp'):
-            message['timestamp'] = time.now()
+            message['timestamp'] = time.time()
 
         # fixup the dimensions_hash
         if not message.get('dimensions_hash') and message.get('dimensions'):
@@ -56,5 +56,5 @@ class MetricsFixer(object):
                 result += '\n'
             return result
         except Exception:
-            LOG.error('Message was not valid json!')
+            LOG.exception('')
             return ''

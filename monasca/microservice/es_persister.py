@@ -60,8 +60,8 @@ class ESPersister(os_service.Service):
                 PROCESSOR_NAMESPACE,
                 cfg.CONF.es_persister.processor,
                 invoke_on_load=True,
-                invoke_kwds={})
-            LOG.debug(dir(self.msg_processor.driver))
+                invoke_kwds={}).driver
+            LOG.debug(dir(self.msg_processor))
         else:
             self.msg_processor = None
 
@@ -76,7 +76,8 @@ class ESPersister(os_service.Service):
                                 msg.message.value)
                         else:
                             value = msg.message.value
-                        self._es_conn.send_messages(value)
+                        if value:
+                            self._es_conn.send_messages(value)
                 # if autocommit is set, this will be a no-op call.
                 self._kafka_conn.commit()
             except Exception:
