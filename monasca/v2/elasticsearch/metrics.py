@@ -193,6 +193,15 @@ class MetricDispatcher(object):
         code = self._kafka_conn.send_messages(msg)
         res.status = getattr(falcon, 'HTTP_' + str(code))
 
+    def _get_agg_response(self, res):
+        if res and res.status_code == 200:
+            obj = res.json()
+            if obj:
+                return obj.get('aggregations')
+            return None
+        else:
+            return None
+
     @resource_api.Restify('/v2.0/metrics/', method='get')
     def do_get_metrics(self, req, res):
         LOG.debug('The metrics GET request is received!')
@@ -213,9 +222,10 @@ class MetricDispatcher(object):
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
         LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
-        if es_res.status_code == 200:
+        res_data = self._get_agg_response(es_res)
+        if res_data:
             # convert the response into monasca metrics format
-            aggs = es_res.json()['aggregations']['by_name']['buckets']
+            aggs = res_data['by_name']['buckets']
             flag = {'is_first': True}
 
             def _render_hits(item):
@@ -262,9 +272,10 @@ class MetricDispatcher(object):
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
         LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
-        if es_res.status_code == 200:
+        res_data = self._get_agg_response(es_res)
+        if res_data:
             # convert the response into monasca metrics format
-            metrics = es_res.json()['aggregations']['by_name']['buckets']
+            metrics = res_data['by_name']['buckets']
 
             def _render_metric(dim):
                 source = dim['dimension']['hits']['hits'][0]['_source']
@@ -322,9 +333,10 @@ class MetricDispatcher(object):
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
         LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
-        if es_res.status_code == 200:
+        res_data = self._get_agg_response(es_res)
+        if res_data:
             # convert the response into monasca metrics format
-            aggs = es_res.json()['aggregations']['by_name']['buckets']
+            aggs = res_data['by_name']['buckets']
 
             col_fields = ['timestamp'] + stats
             col_json = json.dumps(col_fields)
