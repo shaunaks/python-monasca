@@ -21,7 +21,7 @@
 # implementation while leave other implementation dependencies alone.
 
 falcon>=0.1.9
-gunicorn>=19.1.0
+gunicorn>=19.1.0,<=19.2.1
 iso8601>=0.1.9
 kafka-python>=0.8.1
 oslo.config>=1.2.1
@@ -31,3 +31,5 @@ python-dateutil>=1.5
 six>=1.7.0
 stevedore>=0.14
 ujson>=1.33
+babel
+eventlet

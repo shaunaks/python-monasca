@@ -16,6 +16,19 @@ located::
     /etc/monasca/monasca.ini
     /etc/monasca/monasca.conf
 
+If you setup monasca on a brand new machine, most likely some of the
+dependencies are not present. The typical ones are listed below:
+    python setuptools, python-dev, pip
+    
+To install setuptools, please reference to this page.
+https://pypi.python.org/pypi/setuptools
+
+To install python-dev, run the following command:
+    apt-get install python-dev
+
+To install pip, run the following command:
+    easy_install pip
+
 Once the configurations are modified to match your environment, you can start
 up the server by following the following instructions.
 
