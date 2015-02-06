@@ -18,16 +18,19 @@ located::
 
 If you setup monasca on a brand new machine, most likely some of the
 dependencies are not present. The typical ones are listed below:
+
     python setuptools, python-dev, pip
-    
+
 To install setuptools, please reference to this page.
-https://pypi.python.org/pypi/setuptools
 
-To install python-dev, run the following command:
-    apt-get install python-dev
+    https://pypi.python.org/pypi/setuptools
 
-To install pip, run the following command:
-    easy_install pip
+The typical process of installing setuptools is to download the tar.gz file
+then tar -xvf and run python setup.py install
+
+To install python-dev and pip, run the following command:
+
+    apt-get install python-dev python-pip
 
 Once the configurations are modified to match your environment, you can start
 up the server by following the following instructions.
