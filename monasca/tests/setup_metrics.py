@@ -20,7 +20,6 @@
 #
 #
 
-import hashlib
 import json
 import random
 import requests
@@ -47,14 +46,17 @@ def setup_metrics(argv):
         MOLD_DIMENSIONS['key_' + str(a)] = (
             ''.join(random.sample(string.ascii_uppercase * 6, 6)))
 
+        """
+        import hashlib
         key_str = json.dumps(MOLD_DIMENSIONS, sort_keys=True,
                              indent=None,
                              separators=(',', ':'))
 
         key = hashlib.md5(key_str).hexdigest()
+        MOLD['dimensions_hash'] = key
+        """
 
         MOLD['dimensions'] = MOLD_DIMENSIONS
-        MOLD['dimensions_hash'] = key
 
         print('starting round %s' % a)
         # Generate unique 100 metrics
@@ -65,11 +67,31 @@ def setup_metrics(argv):
             for j in range(10):
                 MOLD['value'] = round((i + 1) * j * random.random(), 2)
                 the_time = time.time()
-                for k in range(30):
-                    MOLD['timestamp'] = the_time + k * 5000
+                # single messages
+                for k in range(10):
+                    factor = round(random.random(), 2) * 100
+                    MOLD['timestamp'] = the_time + k * 50000 * factor
                     MOLD['value'] = i * j * k * random.random()
                     res = requests.post(argv[1], data=json.dumps(MOLD))
-                    if res.status_code != 201:
+                    if res.status_code != 201 and res.status_code != 204:
+                        print(json.dumps(MOLD))
+                        exit(0)
+                # multiple messages
+                for k in range(3):
+                    msg = "["
+                    factor = round(random.random(), 2) * 100
+                    MOLD['timestamp'] = the_time + k * 50000 * factor
+                    MOLD['value'] = i * j * k * random.random()
+                    msg += json.dumps(MOLD)
+
+                    for l in range(9):
+                        factor = round(random.random(), 2) * 100
+                        MOLD['timestamp'] = the_time + k * 50000 * factor
+                        MOLD['value'] = i * j * k * random.random()
+                        msg += ',' + json.dumps(MOLD)
+                    msg += "]"
+                    res = requests.post(argv[1], data=msg)
+                    if res.status_code != 201 and res.status_code != 204:
                         print(json.dumps(MOLD))
                         exit(0)
         del MOLD_DIMENSIONS['key_' + str(a)]
