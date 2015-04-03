@@ -168,8 +168,12 @@ class KafkaConnection(object):
                 if msg.message:
                     LOG.debug(msg.message.value)
                     yield msg
+        except common.OffsetOutOfRangeError:
+            self._consumer.seek(0, 0)
+            LOG.error('Seems consumer has been down for a long time.')
+            yield None
         except Exception:
-            LOG.error('Error occurred while handling kafka messages.')
+            LOG.exception()
             self._consumer = None
             yield None
 
@@ -201,8 +205,7 @@ class KafkaConnection(object):
                 common.LeaderNotAvailableError):
             self._client = None
             code = 503
-            LOG.exception('Error occurred while posting data to '
-                          'Kafka.')
+            LOG.exception('Error occurred while posting data to Kafka.')
         except ValueError:
             code = 406
             LOG.exception('Message %s is not valid json.' % messages)
