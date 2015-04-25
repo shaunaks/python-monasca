@@ -1,7 +1,7 @@
 #
-# Copyright 2012-2013 eNovance <licensing@enovance.com>
+# Copyright 2013 IBM Corp
 #
-# Author: Julien Danjou <julien@danjou.info>
+# Author: Tong Li <litong01@us.ibm.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
