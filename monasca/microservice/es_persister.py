@@ -32,6 +32,11 @@ es_opts = [
                help=('The topic that messages will be retrieved from.'
                      'This also will be used as a doc type when saved '
                      'to ElasticSearch.')),
+    cfg.StrOpt('doc_type',
+               default='',
+               help=('The document type which defines what document '
+                     'type the messages will be save into. If not '
+                     'specified, then the topic will be used.')),
     cfg.StrOpt('processor',
                default='',
                help=('The message processer to load to process the message.'
@@ -52,8 +57,14 @@ class ESPersister(os_service.Service):
         super(ESPersister, self).__init__(threads)
         self._kafka_conn = kafka_conn.KafkaConnection(
             cfg.CONF.es_persister.topic)
-        self._es_conn = es_conn.ESConnection(
-            cfg.CONF.es_persister.topic)
+
+        # Use doc_type if it is defined.
+        if cfg.CONF.es_persister.doc_type:
+            self._es_conn = es_conn.ESConnection(
+                cfg.CONF.es_persister.doc_type)
+        else:
+            self._es_conn = es_conn.ESConnection(
+                cfg.CONF.es_persister.topic)
 
         if cfg.CONF.es_persister.processor:
             self.msg_processor = driver.DriverManager(
