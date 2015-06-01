@@ -1,7 +1,6 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # Copyright 2014 Hewlett-Packard
-#
+# Copyright 2015 CMU
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -14,13 +13,10 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import itertools
-import sys
-
 import pyparsing
 
 
 class SubExpr(object):
-
     def __init__(self, tokens):
 
         self._sub_expr = tokens
@@ -71,6 +67,14 @@ class SubExpr(object):
         return [self]
 
     @property
+    def logic_operator(self):
+        return None
+
+    @property
+    def sub_expr_list(self):
+        return []
+
+    @property
     def func(self):
         """Get the function as it appears in the orig expression."""
         return self._func
@@ -102,6 +106,15 @@ class SubExpr(object):
             return self._dimensions.split(",")
         else:
             return []
+
+    @property
+    def dimensions_as_dict(self):
+        """Get the dimensions as a dict."""
+        dimension_dict = {}
+        for di in self.dimensions_as_list:
+            temp = di.split("=")
+            dimension_dict[temp[0]] = temp[1]
+        return dimension_dict
 
     @property
     def operator(self):
@@ -156,11 +169,26 @@ class BinaryOp(object):
     def __init__(self, tokens):
         self.op = tokens[0][1]
         self.operands = tokens[0][0::2]
+        if self.op == u'&&' or self.op == u'and':
+            self.op = u'AND'
+        if self.op == u'||' or self.op == u'or':
+            self.op = u'OR'
 
     @property
     def operands_list(self):
         return ([sub_operand for operand in self.operands for sub_operand in
                  operand.operands_list])
+
+    @property
+    def logic_operator(self):
+        return self.op
+
+    @property
+    def sub_expr_list(self):
+        if self.op:
+            return self.operands
+        else:
+            return []
 
 
 class AndSubExpr(BinaryOp):
@@ -252,46 +280,14 @@ expression = (
 class AlarmExprParser(object):
     def __init__(self, expr):
         self._expr = expr
-
-    @property
-    def sub_expr_list(self):
         # Remove all spaces before parsing. Simple, quick fix for whitespace
         # issue with dimension list not allowing whitespace after comma.
-        parseResult = (expression + pyparsing.stringEnd).parseString(
-            self._expr.replace(' ', ''))
-        sub_expr_list = parseResult[0].operands_list
-        return sub_expr_list
 
-
-def main():
-    """Used for development and testing."""
-
-    expr0 = (
-        "max(-_.千幸福的笑脸{घोड़ा=馬,  "
-        "dn2=dv2,千幸福的笑脸घ=千幸福的笑脸घ}) gte 100 "
-        "times 3 && "
-        "(min(ເຮືອນ{dn3=dv3,家=дом}) < 10 or sum(biz{dn5=dv5}) >9 9and "
-        "count(fizzle) lt 0 or count(baz) > 1)".decode('utf8'))
-
-    expr1 = ("max(foo{hostname=mini-mon,千=千}, 120) > 100 and (max(bar)>100 "
-             " or max(biz)>100)".decode('utf8'))
-
-    expr2 = "max(foo)>=100"
-
-    for expr in (expr0, expr1, expr2):
-        print ('orig expr: {}'.format(expr.encode('utf8')))
-        alarmExprParser = AlarmExprParser(expr)
-        sub_expr = alarmExprParser.sub_expr_list
-        for sub_expression in sub_expr:
-            print ('sub expr: {}'.format(
-                sub_expression.sub_expr_str.encode('utf8')))
-            print ('fmtd sub expr: {}'.format(
-                sub_expression.fmtd_sub_expr_str.encode('utf8')))
-            print ('sub_expr dimensions: {}'.format(
-                sub_expression.dimensions_str.encode('utf8')))
-            print ()
-        print ()
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    @property
+    def parse_result(self):
+        try:
+            parseResult = (expression + pyparsing.stringEnd).parseString(
+                self._expr.replace(' ', ''))
+            return parseResult[0]
+        except Exception:
+            return None
