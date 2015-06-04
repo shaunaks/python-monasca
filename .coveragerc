@@ -1,8 +1,7 @@
 [run]
 branch = True
 source = monasca
-omit = monasca/tests/*
+omit = monasca/tests/*,monasca/openstack/*
 
 [report]
 ignore-errors = True
-

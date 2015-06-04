@@ -81,3 +81,13 @@ To run all the unit test cases, run the following command from the root
 directory of this project
 
     tox -e py27   (or -e py26, -e py33)
+
+To see the unit test case coverage, run the following command from the root
+directory of the project
+
+    tox -e cover
+
+    If the command runs successfully, then set of files will be
+    created in the root directory named cover. Open up the index.html
+    from a browser to see the summary of the unit test coverage and
+    the details.
