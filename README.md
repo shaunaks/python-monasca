@@ -91,6 +91,24 @@ To start the monasca ui server, run the following command
     the ElasticSearch Kibana has been changed. This section needs some
     rework.
 
+Monasca Integration with OpenStack Horizon
+==========================================
+To integrate with Horizon, two projects (monasca-ui and python-monascaclient) have to installed.
+The installation of these two projects can be found here:
+    
+    https://github.com/stackforge/monasca-ui
+    https://github.com/stackforge/python-monascaclient
+    
+Once both projects are installed, some configurations are needed:
+
+    Copy _60_monitoring.py to Horizon openstack_dashboard/local/enabled directory
+    
+    Run the following command to create service and endpoint
+    
+    keystone service-create --name=monitoring --type=monitoring --description="Monasca monitoring service"
+    
+    keystone endpoint-create --region RegionOne --service-id=15d93347201d405cb8c44910e7be6f58 --publicurl=http://192.168.1.190:9090/v2.0 --internalurl=http://192.168.1.190:9090/v2.0 --adminurl=http://192.168.1.190/v2.0
+
 
 Monasca Development
 ===================
