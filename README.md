@@ -1,25 +1,17 @@
-python-monasca
-==================
+Monasca
+=======
 
-python monasca implementation
-=================================
+Monasca is a monitoring software allowing you to collect data from any compute
+systems.
 
-To install the python api implementation, git clone the source and run the
-following command::
+Install Prerequisite
+====================
 
-    sudo python setup.py install
-
-If it installs successfully, you will need to make changes to the following
-two files to reflect your system settings, especially where kafka server is
-located::
-
-    /etc/monasca/monasca.ini
-    /etc/monasca/monasca.conf
-
-If you setup monasca on a brand new machine, most likely some of the
-dependencies are not present. The typical ones are listed below:
-
-    python setuptools, python-dev, pip
+Monasca python implementation install process installs Monasca and most of its
+dependencies automatically. However some components cannot be installed automatically
+by python setup tools, they will have to be installed manually. These components are
+python setup tools, python-dev, gunicorn and python-pip. Follow the steps below to
+install dependencies::
 
 To install setuptools, please reference to this page.
 
@@ -30,10 +22,39 @@ then tar -xvf and run python setup.py install
 
 To install python-dev and pip, run the following command:
 
-    apt-get install python-dev python-pip
+    sudo apt-get install python-dev python-pip
+
+To install gunicorn, run the following command:
+
+    sudo pip install gunicorn==19.1.0
+    
+Monasca depends on Kafka and ElasticSearch, both requires Java. If you do not
+already have Java, Kafka and ElasticSearch server running, you will have to install
+these servers. Please refer to respective document on how to install Java, Kafka and
+ElasticSearch::
+
+    http://www.java.com
+    http://kafka.apache.org/documentation.html#introduction
+    https://www.elastic.co/products/elasticsearch
+
+Install Monasca
+===============
+Get the source code::
+
+    git clone https://github.com/litong01/python-monasca.git
+
+Run the python setup to install::
+
+    sudo python setup.py install
+
+If Monasca installs successfully, you can then make changes to the following
+two files to reflect your system settings, such as Kafka server locations::
+
+    /etc/monasca/monasca.ini
+    /etc/monasca/monasca.conf
 
 Once the configurations are modified to match your environment, you can start
-up the server by following the following instructions.
+up various services by following these instructions.
 
 To start the api server, run the following command:
 
@@ -72,6 +93,9 @@ To start the monasca ui server, run the following command
     the ElasticSearch Kibana has been changed. This section needs some
     rework.
 
+
+Monasca Development
+===================
 To check if the code follows python coding style, run the following command
 from the root directory of this project
 
