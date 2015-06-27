@@ -218,6 +218,7 @@ class MetricDispatcher(object):
             body = '{"aggs":' + _metrics_ag + '}'
 
         LOG.debug('Request body:' + body)
+        LOG.debug('Request url:' + self._query_url)
         es_res = requests.post(self._query_url, data=body)
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
 
