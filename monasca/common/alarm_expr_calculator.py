@@ -13,18 +13,30 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-
-def calc_value(func, data_list):
-    """Calc float values according to 5 functions."""
-    ops = {'SUM': sum,
+agg_ops = {'SUM': sum,
            'AVG': lambda x: sum(x) / len(x),
            'MAX': max,
            'MIN': min,
            'COUNT': len}
-    if len(data_list) == 0 or func not in ops:
+
+
+comp_ops = {'GT': lambda x, y: x <= y,
+            'LT': lambda x, y: x >= y,
+            'LTE': lambda x, y: x > y,
+            'GTE': lambda x, y: x < y}
+
+STATE_OK = 'OK'
+STATE_ALARM = 'ALARM'
+STATE_UNDETERMINED = 'UNDETERMINED'
+
+
+def calc_value(func, data_list):
+    """Calc float values according to 5 functions."""
+
+    if len(data_list) == 0 or func not in agg_ops:
         return None
     else:
-        return ops[func](data_list)
+        return agg_ops[func](data_list)
 
 
 def compare_thresh(values, op, thresh):
@@ -42,18 +54,11 @@ def compare_thresh(values, op, thresh):
     otherwise, the state can be 'ALARM'
     """
 
-    state = 'OK'
     for value in values:
-        if value:
-            if op == 'GT' and value <= thresh:
-                return state
-            elif op == 'LT' and value >= thresh:
-                return state
-            elif op == 'LTE' and value > thresh:
-                return state
-            elif op == 'GTE' and value < thresh:
-                return state
-    state = 'ALARM'
+        if value and comp_ops[op](value, thresh):
+            return STATE_OK
+
+    state = STATE_ALARM
     for value in values:
         if value is None:
             state = 'UNDETERMINED'

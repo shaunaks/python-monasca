@@ -43,22 +43,17 @@ class TestAlarmExprCalculator(tests.BaseTestCase):
 
     def test_compare_thresh(self):
         values = [501, 500, 4999]
-        op = 'GTE'
-        thresh = 500
         self.assertEqual('ALARM',
-                         calculator.compare_thresh(values, op, thresh))
-        op = 'GT'
-        thresh = 500
-        self.assertEqual('OK', calculator.compare_thresh(values, op, thresh))
+                         calculator.compare_thresh(values, 'GTE', 500))
+
+        self.assertEqual('OK', calculator.compare_thresh(values, 'GT', 500))
+
         values = [501, 500, 4999, None]
-        op = 'LTE'
-        thresh = 5000
         self.assertEqual('UNDETERMINED',
-                         calculator.compare_thresh(values, op, thresh))
+                         calculator.compare_thresh(values, 'LTE', 5000))
+
         values = [501, 500, 4999, None]
-        op = 'LT'
-        thresh = 4999
-        self.assertEqual('OK', calculator.compare_thresh(values, op, thresh))
+        self.assertEqual('OK', calculator.compare_thresh(values, 'LT', 4999))
 
     def test_calc_logic(self):
         op = 'AND'
