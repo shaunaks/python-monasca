@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013 IBM Corp
-# Copyright 2015 CMU
+# Copyright 2015 Carnegie Mellon University
 # Author: Yihan Wang <wangff9@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -52,6 +51,10 @@ class TestAlarmExprParser(tests.BaseTestCase):
 
         self.expr7 = "(max(foo)>=100 times 10"
 
+        self.expr8 = ("max(foo,me{hostname=mini-mon,千=千}, 120)"
+                      " = 100 and (max(bar)>100 "
+                      " or max(biz)>100)".decode('utf8'))
+
     def setUp(self):
         super(TestAlarmExprParser, self).setUp()
 
@@ -79,6 +82,9 @@ class TestAlarmExprParser(tests.BaseTestCase):
         self.assertEqual(u'AND', expr.logic_operator)
         self.assertEqual('OR', expr.sub_expr_list[1].logic_operator)
         self.assertEqual(None, expr.sub_expr_list[0].logic_operator)
+        self.assertEqual(
+            'max(foo{hostname=mini-mon,千=千}, 120) > 100'.decode('utf8'),
+            expr.sub_expr_list[0].fmtd_sub_expr_str)
 
         expr = alarm_expr_parser.AlarmExprParser(self.expr2).parse_result
         self.assertEqual(None, expr.logic_operator)
@@ -122,13 +128,33 @@ class TestAlarmExprParser(tests.BaseTestCase):
         expr = alarm_expr_parser.AlarmExprParser(self.expr2).parse_result
         self.assertEqual(10, int(expr.periods))
 
+    def test_period(self):
+        expr = alarm_expr_parser.AlarmExprParser(self.expr1).parse_result
+        self.assertEqual(60, int(expr.sub_expr_list[1].
+                                 sub_expr_list[1].period.encode('utf8')))
+
     def test_operator(self):
         expr = alarm_expr_parser.AlarmExprParser(self.expr1).parse_result
         self.assertEqual('GT', expr.sub_expr_list[1].
                          sub_expr_list[1].normalized_operator.encode('utf8'))
 
         expr = alarm_expr_parser.AlarmExprParser(self.expr2).parse_result
-        self.assertEqual('GTE', expr.normalized_operator)
+        self.assertEqual('>=', expr.operator)
+
+    def test_metric_name(self):
+        expr = alarm_expr_parser.AlarmExprParser(self.expr1).parse_result
+        self.assertEqual('biz', expr.sub_expr_list[1].
+                         sub_expr_list[1].metric_name.encode('utf8'))
+
+    def test_dimensions_str(self):
+        expr = alarm_expr_parser.AlarmExprParser(self.expr2).parse_result
+        temp = expr.dimensions_str
+        self.assertEqual('', temp)
+
+    def test_sub_expr_list(self):
+        expr = alarm_expr_parser.AlarmExprParser(self.expr2).parse_result
+        temp = expr.sub_expr_list
+        self.assertEqual([], temp)
 
     def test_dimensions_list(self):
         expr = alarm_expr_parser.AlarmExprParser(self.expr0).parse_result
@@ -153,3 +179,25 @@ class TestAlarmExprParser(tests.BaseTestCase):
 
         expr = alarm_expr_parser.AlarmExprParser(self.expr2).parse_result
         self.assertEqual({}, expr.dimensions_as_dict)
+
+    def test_related_metrics(self):
+        rm = alarm_expr_parser.AlarmExprParser(self.expr2).related_metrics
+        e_result = []
+        e_result.append({
+            'name': 'foo',
+            'dimensions': {}
+        })
+        self.assertEqual(e_result, rm)
+        rm = alarm_expr_parser.AlarmExprParser(self.expr1).related_metrics
+        self.assertEqual(3, len(rm))
+
+    def test_sub_alarm_expressions(self):
+        sae = (alarm_expr_parser.AlarmExprParser(self.expr1).
+               sub_alarm_expressions)
+        print (sae)
+        self.assertEqual(3, len(sae))
+
+    def test_wrong_format_expr(self):
+        sub_expr_list = (alarm_expr_parser.AlarmExprParser(self.expr8).
+                         sub_expr_list)
+        self.assertEqual(None, sub_expr_list)
