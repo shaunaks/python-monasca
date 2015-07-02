@@ -67,6 +67,8 @@ class ESConnection(object):
         index = self._index_strategy.get_index(day)
         self.post_path = '%s%s%s/%s/_bulk' % (self.uri, self.index_prefix,
                                               index, self.doc_type)
+        self.base_path = '%s%s%s/%s' % (self.uri, self.index_prefix,
+                                        index, self.doc_type)
         LOG.debug('ElasticSearch Connection initialized successfully!')
 
     def send_messages(self, msg):
@@ -84,3 +86,41 @@ class ESConnection(object):
                                           self.doc_type)
             LOG.debug('Search path:', path)
             requests.post(path, data=json.dumps(cond))
+
+    def get_message_by_id(self, id):
+        LOG.debug('Prepare to get messages by id.')
+        if self.drop_data:
+            return ''
+        else:
+            path = self.base_path + '/_search?q=_id:' + id
+            LOG.debug('Search path:' + path)
+            res = requests.get(path)
+            LOG.debug('Msg get with response code: %s' % res.status_code)
+            return res
+
+    def post_messages(self, msg, id):
+        LOG.debug('Prepare to post messages.')
+        if self.drop_data:
+            return 204
+        else:
+            res = requests.post(self.base_path + '/' + id, data=msg)
+            LOG.debug('Msg post with response code: %s' % res.status_code)
+            return res.status_code
+
+    def put_messages(self, msg, id):
+        LOG.debug('Prepare to put messages.')
+        if self.drop_data:
+            return 204
+        else:
+            res = requests.put(self.base_path + '/' + id, data=msg)
+            LOG.debug('Msg put with response code: %s' % res.status_code)
+            return res.status_code
+
+    def del_messages(self, id):
+        LOG.debug('Prepare to delete messages.')
+        if self.drop_data:
+            return 204
+        else:
+            res = requests.delete(self.base_path + '/' + id)
+            LOG.debug('Msg delete with response code: %s' % res.status_code)
+            return res.status_code
