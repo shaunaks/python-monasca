@@ -53,13 +53,19 @@ LOG = log.getLogger(__name__)
 
 
 class AlarmPublisher(threading.Thread):
-    """The thread to publish alarm messages."""
+    """The thread to publish alarm messages.
+
+    This class will periodically call processors to get alarms produced,
+    and send them into kafka
+    """
     def __init__(self, t_name, tp):
         threading.Thread.__init__(self, name=t_name)
+        # init kafka connection to alarm topic
         self._publish_kafka_conn = None
         topic = cfg.CONF.thresholding_engine.alarm_topic
         self._publish_kafka_conn = (
             kafka_conn.KafkaConnection(topic))
+        # set time interval for calling processors to refresh alarms
         self.interval = cfg.CONF.thresholding_engine.check_alarm_interval
         self.thresholding_processors = tp
 
@@ -67,6 +73,7 @@ class AlarmPublisher(threading.Thread):
         if self._publish_kafka_conn:
             if lock.acquire():
                 for processor in self.thresholding_processors:
+                    # get alarms produced by each processor
                     for alarm in (self.thresholding_processors
                                   [processor].process_alarms()):
                         LOG.debug(alarm)
@@ -87,9 +94,14 @@ class AlarmPublisher(threading.Thread):
 
 
 class MetricsConsumer(threading.Thread):
-    """The thread to read metrics."""
+    """The thread to read metrics.
+
+    This class will get metrics messages from kafka,
+    and deliver them to processors.
+    """
     def __init__(self, t_name, tp):
         threading.Thread.__init__(self, name=t_name)
+        # init kafka connection to metrics topic
         self._consume_kafka_conn = None
         topic = cfg.CONF.thresholding_engine.metrics_topic
         self._consume_kafka_conn = kafka_conn.KafkaConnection(topic)
@@ -98,6 +110,7 @@ class MetricsConsumer(threading.Thread):
     def read_metrics(self):
         def consume_metrics():
             if lock.acquire():
+                # read metrics from kafka and deliver it to each processor
                 for alarm_def in self.thresholding_processors:
                     processor = self.thresholding_processors[alarm_def]
                     processor.process_metrics(msg.message.value)
@@ -122,9 +135,15 @@ class MetricsConsumer(threading.Thread):
 
 
 class AlarmDefinitionConsumer(threading.Thread):
-    """The thread to process alarm definitions."""
+    """The thread to process alarm definitions.
+
+    This class will get alarm definition messages from kafka,
+    Then init new processor, update existing processor or delete processor
+    according to the request.
+    """
     def __init__(self, t_name, tp):
         threading.Thread.__init__(self, name=t_name)
+        # init kafka connection to alarm definition topic
         self._consume_kafka_conn = None
         topic = cfg.CONF.thresholding_engine.definition_topic
         self._consume_kafka_conn = (
@@ -133,19 +152,25 @@ class AlarmDefinitionConsumer(threading.Thread):
 
     def read_alarm_def(self):
         def create_alarm_processor():
+            # make sure received a new alarm definition
             if temp_alarm_def['id'] in self.thresholding_processors:
                 LOG.debug('already exsist alarm definition')
                 return
+            # init a processor for this alarm definition
+            temp_processor = (
+                driver.DriverManager(
+                    PROCESSOR_NAMESPACE,
+                    cfg.CONF.thresholding_engine.processor,
+                    invoke_on_load=True,
+                    invoke_args=(msg.message.value,)).driver)
+            # register this new processor
             if lock.acquire():
                 self.thresholding_processors[temp_alarm_def['id']] = (
-                    driver.DriverManager(
-                        PROCESSOR_NAMESPACE,
-                        cfg.CONF.thresholding_engine.processor,
-                        invoke_on_load=True,
-                        invoke_args=(msg.message.value,)).driver)
+                    temp_processor)
             lock.release()
 
         def update_alarm_processor():
+            # update the processor when alarm definition is changed
             if lock.acquire():
                 updated = False
                 if temp_alarm_def['id'] in self.thresholding_processors:
@@ -159,11 +184,13 @@ class AlarmDefinitionConsumer(threading.Thread):
             lock.release()
 
         def delete_alarm_processor():
+            # delete related processor when an alarm definition is deleted
             if lock.acquire():
                 if temp_alarm_def['id'] in self.thresholding_processors:
                     self.thresholding_processors.pop(temp_alarm_def['id'])
             lock.release()
 
+        # get alarm definition message and check the request type
         if self._consume_kafka_conn:
             for msg in self._consume_kafka_conn.get_messages():
                 if msg and msg.message:
@@ -192,9 +219,10 @@ class AlarmDefinitionConsumer(threading.Thread):
 class ThresholdingEngine(os_service.Service):
     def __init__(self, threads=1000):
         super(ThresholdingEngine, self).__init__(threads)
+        # dict to index all the processors,
+        # key = alarm def id; value = processor object
         self.thresholding_processors = {}
-        self.thread_send = None
-        self.thread_read = None
+        # init threads for processing metrics, alarm definition and alarm
         try:
             self.thread_alarm = AlarmPublisher(
                 'alarm_publisher',
