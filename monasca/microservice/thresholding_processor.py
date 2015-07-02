@@ -25,8 +25,40 @@ import uuid
 
 LOG = log.getLogger(__name__)
 
+reasons = {'ALARM': 'The alarm threshold(s) have '
+                    'been exceeded for the sub-alarms',
+           'OK': 'The alarm threshold(s) have '
+                 'not been exceeded for the sub-alarms',
+           'UNDETERMINED': 'Unable to determine the alarm state'}
+
 
 class ThresholdingProcessor(object):
+    """Thresh processor.
+
+    This processor is for alarm definitions with short period.
+    It will store the metrics value/timestamp in memory using dict.
+
+    The basic data structure is:
+    ALL_DATA = {#match_by name#: ALARM_DATA}
+    For example, an alarm def has "match_by": ["hostname", "os"]
+    Metrics come in:
+    Metrics_A -> 'dimensions': {'hostname': 'A', 'os': 'windows'}
+    Metrics_B -> 'dimensions': {'hostname': 'B', 'os': 'unix'}
+    Then, ALL_DATA = {'Awindows': ALARM_DATA, 'Bunix': ALARM_DATA}
+
+    ALARM_DATA = {'state': #alarm state#,
+    'timestamp': #timestamp#, data: SUB_ALARM_DATA, ...}
+    It will hold the overall info of th alarm,
+    like state, timestamps, and metrics data.
+
+    SUB_ALARM_DATA = {#sub alarm expr#: METRICS}
+    For example, alarm expr is 'max(cpu)>10 and avg(memory)<10'
+    SUB_ALARM_DATA = {'max(cpu)>10': METRICS, 'avg(memory)<10': METRICS}
+
+    METRICS = {'value': [X, ...], 'timestamp': [T, ...], 'sub_state': S}
+    Other key/values in a metrics will not be stored here.
+    The state here is the state of this sub_alarm.
+    """
     def __init__(self, alarm_def):
         """One processor instance hold one alarm definition."""
         LOG.debug('initializing ThresholdProcessor!')
@@ -46,6 +78,7 @@ class ThresholdingProcessor(object):
         LOG.debug('successfully initialize ThresholdProcessor!')
 
     def update_thresh_processor(self, alarm_def):
+        """Update the processor with updated alarm definition."""
         def update_data():
             # inherit previous stored metrics values
             for name in self.expr_data_queue:
@@ -97,7 +130,7 @@ class ThresholdingProcessor(object):
             LOG.exception('Received a wrong format metrics')
 
     def process_alarms(self):
-        """Run every minute to produce alarm."""
+        """Called to produce alarms."""
         try:
             alarm_list = []
             for m in self.expr_data_queue.keys():
@@ -111,7 +144,6 @@ class ThresholdingProcessor(object):
 
     def update_state(self, expr_data):
         """Update the state of each alarm under this alarm definition."""
-
         def _calc_state(operand):
             if operand.logic_operator:
                 subs = []
@@ -190,7 +222,6 @@ class ThresholdingProcessor(object):
 
     def add_sub_expr_metrics(self, expr, data):
         """Add new metrics to sub expr place."""
-
         def _has_match_expr():
             if (data['name'].lower() != expr.normalized_metric_name):
                 return False
@@ -229,7 +260,7 @@ class ThresholdingProcessor(object):
             _add_metrics()
 
     def create_data_item(self, name):
-        """If not exist in dict, create one item."""
+        """If new match_up tuple, create new entry to store metrics value."""
         ts = tu.utcnow_ts()
         self.expr_data_queue[name] = {
             'data': {},
@@ -244,6 +275,7 @@ class ThresholdingProcessor(object):
                 'values': []}
 
     def get_matched_data_queue_name(self, data):
+        """Use dimensions in match_up to generate a name."""
         name = ''
         for m in self.match_by:
             if m in data['dimensions']:
@@ -267,9 +299,11 @@ class ThresholdingProcessor(object):
         alarm = {}
         id = str(uuid.uuid4())
         alarm['id'] = id
-        alarm['alarm-definition'] = self.alarm_definition
+        alarm['alarm_definition_id'] = self.alarm_definition['id']
         alarm['metrics'] = self.related_metrics[name]
         alarm['state'] = self.expr_data_queue[name]['state']
+        alarm['reason'] = reasons[alarm['state']]
+        alarm['reason_data'] = {}
         sub_alarms = []
         dt = self.expr_data_queue[name]['data']
         for expr in self.sub_expr_list:
