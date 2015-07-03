@@ -66,20 +66,23 @@ To start the API server, run the following command:
 
 To start a Monasca micro service server, run the following command:
 
-    monasca-service --config-file /etc/monasca/monasca-xxxx.conf
+    monasca-service --config-file /etc/monasca/xxxx.conf
 
-    where monasca-xxxx.conf should be a micro service specific
-    configuration file. For example, to start the ElasticSearch persister
-    micro service which read messages off of Kafka queue and save the
-    messages onto ElasticSearch, run the following command:
+    where xxxx.conf should be a micro service specific configuration file.
+    For example, to start the metric persister microservice which read
+    metric messages off of a Kafka queue and save the metrics onto
+    ElasticSearch, run the following command:
 
-    monasca-service --config-file /etc/monasca/monasca-persister.conf
+    monasca-service --config-file /etc/monasca/metrics-persister.conf
+
+    Run the following command to start alarm persister service:
+
+    monasca-service --config-file /etc/monasca/alarms-persister.conf
 
 In the future, there might be other services such as threshold engine,
 anomaly detection, alarms etc. All these services should be able to take
 a specific configuration file to be launched. Here are the examples:
 
-    monasca-service --config-file /etc/monasca/monasca-alarms.conf
     monasca-service --config-file /etc/monasca/monasca-anomaly.conf
     monasca-service --config-file /etc/monasca/monasca-threshold.conf
 
@@ -121,6 +124,10 @@ To run all the unit test cases, run the following command from the root
 directory of this project
 
     tox -e py27   (or -e py26, -e py33)
+
+To run a test module, specify the module name at the end of the command:
+
+    tox -e py27 tests.v2.elasticsearch.test_metrics
 
 To see the unit test case coverage, run the following command from the root
 directory of the project

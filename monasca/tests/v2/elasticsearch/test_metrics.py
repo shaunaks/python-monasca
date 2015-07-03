@@ -74,11 +74,13 @@ class TestParamUtil(base.BaseTestCase):
 class TestMetricDispatcher(base.BaseTestCase):
 
     def setUp(self):
-        self.CONF = self.useFixture(fixture_config.Config()).conf
-        self.CONF.kafka_opts.uri = 'fake_url'
-        self.CONF.metrics.topic = 'fake'
-        self.CONF.es.uri = 'fake_es_uri'
         super(TestMetricDispatcher, self).setUp()
+        self.CONF = self.useFixture(fixture_config.Config()).conf
+        self.CONF.set_override('uri', 'fake_url', group='kafka_opts')
+        self.CONF.set_override('topic', 'fake', group='metrics')
+        self.CONF.set_override('index_prefix', 'also_fake', group='metrics')
+        self.CONF.set_override('uri', 'fake_es_uri', group='es_conn')
+
         res = mock.Mock()
         res.status_code = 200
         res.json.return_value = {"data": {"mappings": {"fake": {
@@ -109,7 +111,7 @@ class TestMetricDispatcher(base.BaseTestCase):
 
         # test that the query url is correctly formed
         self.assertEqual(self.dispatcher._query_url, (
-            'fake_es_uri/monasca_*/fake/_search?search_type=count'))
+            'fake_es_uri/also_fake*/fake/_search?search_type=count'))
 
     def test_post_data(self):
         with mock.patch.object(kafka_conn.KafkaConnection, 'send_messages',

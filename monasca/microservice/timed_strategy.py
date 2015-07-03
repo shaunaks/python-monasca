@@ -53,23 +53,24 @@ OPTS = [
                help='The start date.'),
 ]
 
-cfg.CONF.register_opts(OPTS, group="strategy")
+cfg.CONF.register_opts(OPTS, group="timed_strategy")
 
 LOG = log.getLogger(__name__)
 
 
-class IndexStrategy(object):
+class TimedStrategy(object):
 
     def __init__(self):
-        self.time_unit = cfg.CONF.strategy.time_unit
-        self.frequency = cfg.CONF.strategy.frequency
-        self.start_date = dparser.parse(cfg.CONF.strategy.start_date,
+        self.time_unit = cfg.CONF.timed_strategy.time_unit
+        self.frequency = cfg.CONF.timed_strategy.frequency
+        self.start_date = dparser.parse(cfg.CONF.timed_strategy.start_date,
                                         fuzzy=True)
-        LOG.debug('IndexStrategy initialized successfully!')
+        LOG.debug('TimedStrategy initialized successfully!')
 
-    def get_index(self, a_date):
+    def get_index(self):
         # Right now, only support frequency of 1.
         # To support any frequency greater than 1, we need more work.
+        a_date = datetime.datetime.now()
         if isinstance(a_date, long) or isinstance(a_date, int):
             try:
                 a_date = datetime.datetime.fromtimestamp(a_date)

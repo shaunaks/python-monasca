@@ -31,7 +31,7 @@ except ImportError:
 from monasca.openstack.common import log
 
 
-kafka_opts = [
+KAFKA_OPTS = [
     cfg.StrOpt('uri', help='Address to kafka server. For example: '
                'uri=192.168.1.191:9092'),
     cfg.StrOpt('group', default='api',
@@ -57,9 +57,7 @@ kafka_opts = [
                       'This parameter is only for testing purposes.')),
 ]
 
-kafka_group = cfg.OptGroup(name='kafka_opts', title='title')
-cfg.CONF.register_group(kafka_group)
-cfg.CONF.register_opts(kafka_opts, kafka_group)
+cfg.CONF.register_opts(KAFKA_OPTS, group="kafka_opts")
 
 LOG = log.getLogger(__name__)
 
@@ -172,8 +170,8 @@ class KafkaConnection(object):
             self._consumer.seek(0, 0)
             LOG.error('Seems consumer has been down for a long time.')
             yield None
-        except Exception:
-            LOG.exception()
+        except Exception as ex:
+            LOG.exception(ex)
             self._consumer = None
             yield None
 

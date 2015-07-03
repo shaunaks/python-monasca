@@ -18,6 +18,7 @@ import datetime
 import falcon
 from oslo.config import cfg
 import requests
+from stevedore import driver
 import time
 
 from monasca.common import es_conn
@@ -32,9 +33,15 @@ except ImportError:
     import json
 
 
-metrics_opts = [
+STRATEGY_NAMESPACE = 'monasca.index.strategy'
+
+METRICS_OPTS = [
     cfg.StrOpt('topic', default='metrics',
                help='The topic that metrics will be published to.'),
+    cfg.StrOpt('index_strategy', default='fixed',
+               help='The index strategy used to create index name.'),
+    cfg.StrOpt('index_prefix', default='data_',
+               help='The index prefix where metrics were saved to.'),
     cfg.IntOpt('size', default=10000,
                help=('The query result limit. Any result set more than '
                      'the limit will be discarded. To see all the matching '
@@ -42,9 +49,7 @@ metrics_opts = [
                      'window or strong matching name')),
 ]
 
-metrics_group = cfg.OptGroup(name='metrics', title='metrics')
-cfg.CONF.register_group(metrics_group)
-cfg.CONF.register_opts(metrics_opts, metrics_group)
+cfg.CONF.register_opts(METRICS_OPTS, group="metrics")
 
 LOG = log.getLogger(__name__)
 
@@ -131,7 +136,22 @@ class MetricDispatcher(object):
         self.topic = cfg.CONF.metrics.topic
         self.size = cfg.CONF.metrics.size
         self._kafka_conn = kafka_conn.KafkaConnection(self.topic)
-        self._es_conn = es_conn.ESConnection(self.topic)
+
+        # load index strategy
+        if cfg.CONF.metrics.index_strategy:
+            self.index_strategy = driver.DriverManager(
+                STRATEGY_NAMESPACE,
+                cfg.CONF.metrics.index_strategy,
+                invoke_on_load=True,
+                invoke_kwds={}).driver
+            LOG.debug(dir(self.index_strategy))
+        else:
+            self.index_strategy = None
+
+        self.index_prefix = cfg.CONF.metrics.index_prefix
+
+        self._es_conn = es_conn.ESConnection(
+            self.topic, self.index_strategy, self.index_prefix)
 
         # Setup the get metrics query body pattern
         self._query_body = {

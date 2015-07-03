@@ -14,22 +14,17 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import datetime
 from oslo.config import cfg
 import requests
 import ujson as json
 
-from monasca.common import strategy
 from monasca.openstack.common import log
 
 
-OPTS = [
+ES_OPTS = [
     cfg.StrOpt('uri',
                help='Address to kafka server. For example: '
                'uri=http://192.168.1.191:9200/'),
-    cfg.StrOpt('index_prefix',
-               default='monasca_',
-               help='The prefix for an index.'),
     cfg.StrOpt('time_id',
                default='timestamp',
                help='The type of the data.'),
@@ -39,34 +34,34 @@ OPTS = [
                       'This parameter is only for testing purposes.')),
 ]
 
-cfg.CONF.register_opts(OPTS, group="es")
+cfg.CONF.register_opts(ES_OPTS, group="es_conn")
 
 LOG = log.getLogger(__name__)
 
 
 class ESConnection(object):
 
-    def __init__(self, doc_type):
-        if not cfg.CONF.es.uri:
+    def __init__(self, doc_type, index_stratey, index_prefix):
+        if not cfg.CONF.es_conn.uri:
             raise Exception('ElasticSearch is not configured correctly! '
                             'Use configuration file to specify ElasticSearch '
                             'uri, for example: '
                             'uri=192.168.1.191:9200')
 
-        self.uri = cfg.CONF.es.uri
+        self.uri = cfg.CONF.es_conn.uri
         if self.uri.strip()[-1] != '/':
             self.uri += '/'
-        self.index_prefix = cfg.CONF.es.index_prefix
+
         self.doc_type = doc_type
-        self.time_id = cfg.CONF.es.time_id
-        self.drop_data = cfg.CONF.es.drop_data
+        self.index_strategy = index_stratey
+        self.index_prefix = index_prefix
 
-        self._index_strategy = strategy.IndexStrategy()
+        self.time_id = cfg.CONF.es_conn.time_id
+        self.drop_data = cfg.CONF.es_conn.drop_data
 
-        day = datetime.datetime.now()
-        index = self._index_strategy.get_index(day)
-        self.post_path = '%s%s%s/%s/_bulk' % (self.uri, self.index_prefix,
-                                              index, self.doc_type)
+        self.search_path = '%s%s*/%s/_search' % (self.uri,
+                                                 self.index_prefix,
+                                                 self.doc_type)
         LOG.debug('ElasticSearch Connection initialized successfully!')
 
     def send_messages(self, msg):
@@ -74,13 +69,20 @@ class ESConnection(object):
         if self.drop_data:
             return
         else:
-            res = requests.post(self.post_path, data=msg)
+            # index may change over the time, it has to be called for each
+            # request
+            index = self.index_strategy.get_index()
+            path = '%s%s%s/%s/_bulk' % (self.uri, self.index_prefix,
+                                        index, self.doc_type)
+            res = requests.post(path, data=msg)
             LOG.debug('Msg posted with response code: %s' % res.status_code)
+            return res.status_code
 
     def get_messages(self, cond):
         LOG.debug('Prepare to get messages.')
         if cond:
-            path = '%s%s%*/%s/_search' % (self.uri, self.index_prefix,
-                                          self.doc_type)
-            LOG.debug('Search path:', path)
-            requests.post(path, data=json.dumps(cond))
+            data = json.dumps(cond)
+        else:
+            data = {}
+        res = requests.post(self.search_path, data=data)
+        return res.status_code
