@@ -84,5 +84,51 @@ class ESConnection(object):
             data = json.dumps(cond)
         else:
             data = {}
-        res = requests.post(self.search_path, data=data)
-        return res.status_code
+        return requests.post(self.search_path, data=data)
+
+    def get_message_by_id(self, id):
+        LOG.debug('Prepare to get messages by id.')
+        path = self.search_path + '?q=_id:' + id
+        LOG.debug('Search path:' + path)
+        res = requests.get(path)
+        LOG.debug('Msg get with response code: %s' % res.status_code)
+        return res
+
+    def post_messages(self, msg, id):
+        LOG.debug('Prepare to post messages.')
+        if self.drop_data:
+            return 204
+        else:
+            index = self.index_strategy.get_index()
+            path = '%s%s%s/%s/' % (self.uri, self.index_prefix,
+                                   index, self.doc_type)
+
+            res = requests.post(path + id, data=msg)
+            LOG.debug('Msg post with response code: %s' % res.status_code)
+            return res.status_code
+
+    def put_messages(self, msg, id):
+        LOG.debug('Prepare to put messages.')
+        if self.drop_data:
+            return 204
+        else:
+            index = self.index_strategy.get_index()
+            path = '%s%s%s/%s/' % (self.uri, self.index_prefix,
+                                   index, self.doc_type)
+
+            res = requests.put(path + id, data=msg)
+            LOG.debug('Msg put with response code: %s' % res.status_code)
+            return res.status_code
+
+    def del_messages(self, id):
+        LOG.debug('Prepare to delete messages.')
+        if self.drop_data:
+            return 204
+        else:
+            index = self.index_strategy.get_index()
+            path = '%s%s%s/%s/' % (self.uri, self.index_prefix,
+                                   index, self.doc_type)
+
+            res = requests.delete(path + id)
+            LOG.debug('Msg delete with response code: %s' % res.status_code)
+            return res.status_code

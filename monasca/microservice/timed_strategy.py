@@ -65,12 +65,19 @@ class TimedStrategy(object):
         self.frequency = cfg.CONF.timed_strategy.frequency
         self.start_date = dparser.parse(cfg.CONF.timed_strategy.start_date,
                                         fuzzy=True)
+        self.now = None
         LOG.debug('TimedStrategy initialized successfully!')
+
+    def set_time(self, a_date):
+        self.now = a_date
 
     def get_index(self):
         # Right now, only support frequency of 1.
         # To support any frequency greater than 1, we need more work.
-        a_date = datetime.datetime.now()
+        if self.now:
+            a_date = self.now
+        else:
+            a_date = datetime.datetime.now()
         if isinstance(a_date, long) or isinstance(a_date, int):
             try:
                 a_date = datetime.datetime.fromtimestamp(a_date)
