@@ -22,7 +22,7 @@ from oslotest import base
 import requests
 
 from monasca.common import es_conn
-from monasca.v2.elasticsearch import notifications
+from monasca.v2.elasticsearch import notificationmethods
 
 try:
     import ujson as json
@@ -75,7 +75,7 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
 
     def setUp(self):
         self.CONF = self.useFixture(fixture_config.Config()).conf
-        self.CONF.notification.topic_notification_methods = 'fake'
+        self.CONF.notifi_method.doc_type = 'fake'
         self.CONF.es_conn.uri = 'fake_es_uri'
         super(TestNotificationMethodDispatcher, self).setUp()
         res = mock.Mock()
@@ -96,23 +96,23 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
         with mock.patch.object(requests, 'get',
                                return_value=res):
             self.dispatcher_get = (
-                notifications.NotificationMethodDispatcher({}))
+                notificationmethods.NotificationMethodDispatcher({}))
 
         res.json.return_value = {}
         with mock.patch.object(requests, 'post',
                                return_value=res):
             self.dispatcher_post = (
-                notifications.NotificationMethodDispatcher({}))
+                notificationmethods.NotificationMethodDispatcher({}))
 
         with mock.patch.object(requests, 'put',
                                return_value=res):
             self.dispatcher_put = (
-                notifications.NotificationMethodDispatcher({}))
+                notificationmethods.NotificationMethodDispatcher({}))
 
         with mock.patch.object(requests, 'delete',
                                return_value=res):
             self.dispatcher_delete = (
-                notifications.NotificationMethodDispatcher({}))
+                notificationmethods.NotificationMethodDispatcher({}))
 
     def test_initialization(self):
         # test that the doc type of the es connection is fake
@@ -130,7 +130,7 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
                 '"c60ec47e-5038-4bf1-9f95-4046c6e9a719",'
                 '"name":"NotificationMethod",'
                 '"address":"hanc@andrew.cmu.edu"}')
-            np = notifications.NotificationMethodDispatcher({})
+            np = notificationmethods.NotificationMethodDispatcher({})
             np.handle_notification_msg(msg)
 
         with mock.patch.object(es_conn.ESConnection, 'put_messages',
@@ -141,7 +141,7 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
                 '"c60ec47e-5038-4bf1-9f95-4046c6e9a719",'
                 '"name":"NotificationMethod",'
                 '"address":"hanc@andrew.cmu.edu"}')
-            np = notifications.NotificationMethodDispatcher({})
+            np = notificationmethods.NotificationMethodDispatcher({})
             np.handle_notification_msg(msg)
 
         with mock.patch.object(es_conn.ESConnection, 'del_messages',
@@ -152,7 +152,7 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
                 '"c60ec47e-5038-4bf1-9f95-4046c6e9a719",'
                 '"name":"NotificationMethod",'
                 '"address":"hanc@andrew.cmu.edu"}')
-            np = notifications.NotificationMethodDispatcher({})
+            np = notificationmethods.NotificationMethodDispatcher({})
             np.handle_notification_msg(msg)
 
     def test_do_get_notifications(self):
@@ -180,9 +180,9 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
         self.assertEqual(len(obj), 1)
 
     def test_do_post_notifications(self):
-        with mock.patch.object(notifications.NotificationMethodDispatcher,
-                               'handle_notification_msg',
-                               return_value=200):
+        with mock.patch.object(
+                notificationmethods.NotificationMethodDispatcher,
+                'handle_notification_msg', return_value=200):
             with mock.patch.object(ast, 'literal_eval',
                                    return_value=ast.literal_eval(
                                        "{'type': 'PAGEDUTY', "
@@ -195,9 +195,9 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
                 self.assertEqual(getattr(falcon, 'HTTP_200'), res.status)
 
     def test_do_put_notifications(self):
-        with mock.patch.object(notifications.NotificationMethodDispatcher,
-                               'handle_notification_msg',
-                               return_value=200):
+        with mock.patch.object(
+                notificationmethods.NotificationMethodDispatcher,
+                'handle_notification_msg', return_value=200):
             with mock.patch.object(ast, 'literal_eval',
                                    return_value=ast.literal_eval(
                                        "{'type': 'PAGEDUTY', "
@@ -212,9 +212,9 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
                 self.assertEqual(getattr(falcon, 'HTTP_200'), res.status)
 
     def test_do_delete_notifications(self):
-        with mock.patch.object(notifications.NotificationMethodDispatcher,
-                               'handle_notification_msg',
-                               return_value=200):
+        with mock.patch.object(
+                notificationmethods.NotificationMethodDispatcher,
+                'handle_notification_msg', return_value=200):
             res = mock.Mock()
             (self.dispatcher_post.
                 do_delete_notification_methods(

@@ -23,7 +23,7 @@ LOG = log.getLogger(__name__)
 
 OPTS = [
     cfg.StrOpt('index_name',
-               default='data_',
+               default='',
                help='The pre-configured index name.'),
 ]
 

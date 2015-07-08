@@ -15,41 +15,58 @@
 # under the License.
 
 import email.mime.text
+from oslo.config import cfg
 import smtplib
 
 from monasca.openstack.common import log
+
+MAILSENDER_OPTS = [
+    cfg.StrOpt('username',
+               default='monasca.notification@gmail.com',
+               help='The email account user name.'),
+    cfg.StrOpt('password',
+               default='password',
+               help='The email account user password.'),
+    cfg.StrOpt('smtp_host', default='smtp.gmail.com',
+               help='The email service host.'),
+    cfg.IntOpt('port', default=25,
+               help='The email service port.'),
+    cfg.BoolOpt('use_tls', default=True,
+                help='Set to True if the service uses TLS.'),
+
+]
+
+cfg.CONF.register_opts(MAILSENDER_OPTS, group="mailsender")
 
 LOG = log.getLogger(__name__)
 
 
 class EmailSender(object):
-    """Send emails to notify user."""
-    mail_username = 'monasca.notification@gmail.com'
-    mail_password = 'notification'
-    HOST = 'smtp.gmail.com'
-    PORT = 25
-    from_addr = mail_username
-    smtp = None
 
     def __init__(self):
+        self.username = cfg.CONF.mailsender.username
+        self.password = cfg.CONF.mailsender.password
+        self.smtp_host = cfg.CONF.mailsender.smtp_host
+        self.port = cfg.CONF.mailsender.port
+        self.use_tls = cfg.CONF.mailsender.use_tls
+        self.from_addr = self.username
+
         self.smtp = smtplib.SMTP()
-        # show the debug log
-        self.smtp.set_debuglevel(1)
 
         LOG.debug('connecting ...')
 
         # connect
         try:
-            self.smtp.connect(self.HOST, self.PORT)
+            self.smtp.connect(self.smtp_host, self.port)
         except Exception:
             LOG.debug('SMTP Connection error.')
 
-        # gmail uses ssl
-        self.smtp.starttls()
+        if self.use_tls:
+            self.smtp.starttls()
         # login with username & password
         try:
             LOG.debug('Login ...')
-            self.smtp.login(self.mail_username, self.mail_password)
+            self.smtp.login(self.username, self.password)
         except Exception:
             LOG.debug('Login exception.')
 

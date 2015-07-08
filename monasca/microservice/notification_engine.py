@@ -25,26 +25,20 @@ from monasca.openstack.common import service as os_service
 PROCESSOR_NAMESPACE = 'monasca.message.processor'
 STRATEGY_NAMESPACE = 'monasca.index.strategy'
 
-es_opts = [
+NOTIFICATION_OPTS = [
     cfg.StrOpt('topic',
                default='alarm',
                help=('The topic that messages will be retrieved from.'
                      'This also will be used as a doc type when saved '
-                     'to ElasticSearch.')),
-    cfg.StrOpt('topic_notification_methods',
-               default='notification_methods',
-               help=('The topic that messages will be retrieved from.'
-                     'This also will be used as a doc type when saved '
-                     'to ElasticSearch.')),
-    cfg.StrOpt('index_strategy', default='fixed',
-               help='The index strategy used to create index name.'),
-    cfg.StrOpt('index_prefix', default='data_',
-               help='The index prefix where metrics were saved to.'),
+                     'to ElasticSearch if doc_type is not define.')),
     cfg.StrOpt('doc_type',
                default='',
                help=('The document type which defines what document '
-                     'type the messages will be save into. If not '
-                     'specified, then the topic will be used.')),
+                     'type the notification methods were saved into.')),
+    cfg.StrOpt('index_strategy', default='fixed',
+               help='The index strategy used to create index name.'),
+    cfg.StrOpt('index_prefix', default='',
+               help='The index prefix where metrics were saved to.'),
     cfg.StrOpt('processor',
                default='',
                help=('The message processer to load to process the message.'
@@ -52,9 +46,7 @@ es_opts = [
                      'leave the default')),
 ]
 
-es_group = cfg.OptGroup(name='notification', title='notification')
-cfg.CONF.register_group(es_group)
-cfg.CONF.register_opts(es_opts, es_group)
+cfg.CONF.register_opts(NOTIFICATION_OPTS, group="notification")
 
 LOG = log.getLogger(__name__)
 
@@ -65,7 +57,10 @@ class NotificationEngine(os_service.Service):
         super(NotificationEngine, self).__init__(threads)
         self._kafka_conn = kafka_conn.KafkaConnection(
             cfg.CONF.notification.topic)
-        self.topic = cfg.CONF.notification.topic_notification_methods
+        if cfg.CONF.notification.doc_type:
+            self.doc_type = cfg.CONF.notification.doc_type
+        else:
+            self.doc_type = cfg.CONF.notification.topic
 
         # load index strategy
         if cfg.CONF.notification.index_strategy:
@@ -81,7 +76,7 @@ class NotificationEngine(os_service.Service):
         self.index_prefix = cfg.CONF.notification.index_prefix
 
         self._es_conn = es_conn.ESConnection(
-            self.topic, self.index_strategy, self.index_prefix)
+            self.doc_type, self.index_strategy, self.index_prefix)
 
         if cfg.CONF.notification.processor:
             self.notification_processor = driver.DriverManager(

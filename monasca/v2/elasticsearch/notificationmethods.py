@@ -33,10 +33,10 @@ except ImportError:
     import json
 
 
-opts = [
-    cfg.StrOpt('topic_notification_methods', default='notification_methods',
-               help='The topic that notification_methods '
-                    'will be published to.'),
+NOTIFI_METHOD_OPTS = [
+    cfg.StrOpt('doc_type', default='admin',
+               help='The doc type that notification_methods '
+                    'will be saved into.'),
     cfg.StrOpt('index_strategy', default='fixed',
                help='The index strategy used to create index name.'),
     cfg.StrOpt('index_prefix', default='data_',
@@ -48,10 +48,7 @@ opts = [
                      'window or strong matching name')),
 ]
 
-notification_group = cfg.OptGroup(
-    name='notification', title='notification_methods')
-cfg.CONF.register_group(notification_group)
-cfg.CONF.register_opts(opts, notification_group)
+cfg.CONF.register_opts(NOTIFI_METHOD_OPTS, group="notifi_method")
 
 LOG = log.getLogger(__name__)
 
@@ -108,24 +105,24 @@ class NotificationMethodDispatcher(object):
     def __init__(self, global_conf):
         LOG.debug('initializing V2API in NotificationMethodDispatcher!')
         super(NotificationMethodDispatcher, self).__init__()
-        self.topic = cfg.CONF.notification.topic_notification_methods
-        self.size = cfg.CONF.notification.size
+        self.doc_type = cfg.CONF.notifi_method.doc_type
+        self.size = cfg.CONF.notifi_method.size
 
         # load index strategy
-        if cfg.CONF.notification.index_strategy:
+        if cfg.CONF.notifi_method.index_strategy:
             self.index_strategy = driver.DriverManager(
                 STRATEGY_NAMESPACE,
-                cfg.CONF.notification.index_strategy,
+                cfg.CONF.notifi_method.index_strategy,
                 invoke_on_load=True,
                 invoke_kwds={}).driver
             LOG.debug(dir(self.index_strategy))
         else:
             self.index_strategy = None
 
-        self.index_prefix = cfg.CONF.notification.index_prefix
+        self.index_prefix = cfg.CONF.notifi_method.index_prefix
 
         self._es_conn = es_conn.ESConnection(
-            self.topic, self.index_strategy, self.index_prefix)
+            self.doc_type, self.index_strategy, self.index_prefix)
 
     def post_data(self, req, res):
         LOG.debug('In NotificationMethodDispatcher::post_data.')
@@ -243,7 +240,7 @@ class NotificationMethodDispatcher(object):
         # dispatcher topic, then add the key word _search.
         # self._query_url = ''.join([self._es_conn.uri,
         #                           self._es_conn.index_prefix, '/',
-        #                           cfg.CONF.notification.topic,
+        #                           cfg.CONF.notifi_method.doc_type,
         #         '/_search?size=', str(self.size), '&q=_id:', id])
         #
 
