@@ -25,16 +25,14 @@ from monasca.openstack.common import service as os_service
 PROCESSOR_NAMESPACE = 'monasca.message.processor'
 STRATEGY_NAMESPACE = 'monasca.index.strategy'
 
-NOTIFICATION_OPTS = [
+NOTIFICATION_ENGINE_OPTS = [
     cfg.StrOpt('topic',
-               default='alarm',
-               help=('The topic that messages will be retrieved from.'
-                     'This also will be used as a doc type when saved '
-                     'to ElasticSearch if doc_type is not define.')),
+               default='alarms',
+               help='The topic that messages will be retrieved from.'),
     cfg.StrOpt('doc_type',
-               default='',
-               help=('The document type which defines what document '
-                     'type the notification methods were saved into.')),
+               default='notificationmethods',
+               help=('The document type which notification methods were '
+                     'saved into.')),
     cfg.StrOpt('index_strategy', default='fixed',
                help='The index strategy used to create index name.'),
     cfg.StrOpt('index_prefix', default='',
@@ -46,7 +44,7 @@ NOTIFICATION_OPTS = [
                      'leave the default')),
 ]
 
-cfg.CONF.register_opts(NOTIFICATION_OPTS, group="notification")
+cfg.CONF.register_opts(NOTIFICATION_ENGINE_OPTS, group="notificationengine")
 
 LOG = log.getLogger(__name__)
 
@@ -56,32 +54,29 @@ class NotificationEngine(os_service.Service):
     def __init__(self, threads=1000):
         super(NotificationEngine, self).__init__(threads)
         self._kafka_conn = kafka_conn.KafkaConnection(
-            cfg.CONF.notification.topic)
-        if cfg.CONF.notification.doc_type:
-            self.doc_type = cfg.CONF.notification.doc_type
-        else:
-            self.doc_type = cfg.CONF.notification.topic
+            cfg.CONF.notificationengine.topic)
+        self.doc_type = cfg.CONF.notificationengine.doc_type
 
         # load index strategy
-        if cfg.CONF.notification.index_strategy:
+        if cfg.CONF.notificationengine.index_strategy:
             self.index_strategy = driver.DriverManager(
                 STRATEGY_NAMESPACE,
-                cfg.CONF.notification.index_strategy,
+                cfg.CONF.notificationengine.index_strategy,
                 invoke_on_load=True,
                 invoke_kwds={}).driver
             LOG.debug(dir(self.index_strategy))
         else:
             self.index_strategy = None
 
-        self.index_prefix = cfg.CONF.notification.index_prefix
+        self.index_prefix = cfg.CONF.notificationengine.index_prefix
 
         self._es_conn = es_conn.ESConnection(
             self.doc_type, self.index_strategy, self.index_prefix)
 
-        if cfg.CONF.notification.processor:
+        if cfg.CONF.notificationengine.processor:
             self.notification_processor = driver.DriverManager(
                 PROCESSOR_NAMESPACE,
-                cfg.CONF.notification.processor,
+                cfg.CONF.notificationengine.processor,
                 invoke_on_load=True,
                 invoke_kwds={}).driver
             LOG.debug(dir(self.notification_processor))
