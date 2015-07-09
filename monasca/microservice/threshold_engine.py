@@ -27,7 +27,7 @@ import time
 PROCESSOR_NAMESPACE = 'monasca.message.processor'
 lock = threading.RLock()
 
-TH_OPTS = [
+THRESHOLD_ENGINE_OPTS = [
     cfg.StrOpt('metrics_topic',
                default='metrics',
                help='topics to read metrics'),
@@ -44,7 +44,7 @@ TH_OPTS = [
                default=60)
 ]
 
-cfg.CONF.register_opts(TH_OPTS, group="thresholding_engine")
+cfg.CONF.register_opts(THRESHOLD_ENGINE_OPTS, group="thresholdengine")
 
 LOG = log.getLogger(__name__)
 
@@ -59,11 +59,11 @@ class AlarmPublisher(threading.Thread):
         threading.Thread.__init__(self, name=t_name)
         # init kafka connection to alarm topic
         self._publish_kafka_conn = None
-        topic = cfg.CONF.thresholding_engine.alarm_topic
+        topic = cfg.CONF.thresholdengine.alarm_topic
         self._publish_kafka_conn = (
             kafka_conn.KafkaConnection(topic))
         # set time interval for calling processors to refresh alarms
-        self.interval = cfg.CONF.thresholding_engine.check_alarm_interval
+        self.interval = cfg.CONF.thresholdengine.check_alarm_interval
         self.thresholding_processors = tp
 
     def send_alarm(self):
@@ -100,7 +100,7 @@ class MetricsConsumer(threading.Thread):
         threading.Thread.__init__(self, name=t_name)
         # init kafka connection to metrics topic
         self._consume_kafka_conn = None
-        topic = cfg.CONF.thresholding_engine.metrics_topic
+        topic = cfg.CONF.thresholdengine.metrics_topic
         self._consume_kafka_conn = kafka_conn.KafkaConnection(topic)
         self.thresholding_processors = tp
 
@@ -142,7 +142,7 @@ class AlarmDefinitionConsumer(threading.Thread):
         threading.Thread.__init__(self, name=t_name)
         # init kafka connection to alarm definition topic
         self._consume_kafka_conn = None
-        topic = cfg.CONF.thresholding_engine.definition_topic
+        topic = cfg.CONF.thresholdengine.definition_topic
         self._consume_kafka_conn = (
             kafka_conn.KafkaConnection(topic))
         self.thresholding_processors = tp
@@ -157,7 +157,7 @@ class AlarmDefinitionConsumer(threading.Thread):
             temp_processor = (
                 driver.DriverManager(
                     PROCESSOR_NAMESPACE,
-                    cfg.CONF.thresholding_engine.processor,
+                    cfg.CONF.thresholdengine.processor,
                     invoke_on_load=True,
                     invoke_args=(msg.message.value,)).driver)
             # register this new processor
@@ -213,9 +213,9 @@ class AlarmDefinitionConsumer(threading.Thread):
         self._consume_kafka_conn.close()
 
 
-class ThresholdingEngine(os_service.Service):
+class ThresholdEngine(os_service.Service):
     def __init__(self, threads=1000):
-        super(ThresholdingEngine, self).__init__(threads)
+        super(ThresholdEngine, self).__init__(threads)
         # dict to index all the processors,
         # key = alarm def id; value = processor object
         self.thresholding_processors = {}
@@ -258,4 +258,4 @@ class ThresholdingEngine(os_service.Service):
                 self.thread_metrics.stop()
         except Exception:
             LOG.debug('Terminate thresh process threads error')
-        super(ThresholdingEngine, self).stop()
+        super(ThresholdEngine, self).stop()

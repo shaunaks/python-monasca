@@ -15,7 +15,7 @@
 # under the License.
 
 import json
-from monasca.microservice import thresholding_processor as processor
+from monasca.microservice import threshold_processor as processor
 from monasca.openstack.common import log
 from monasca.openstack.common import timeutils as tu
 from monasca import tests
@@ -23,9 +23,9 @@ from monasca import tests
 LOG = log.getLogger(__name__)
 
 
-class TestThresholdingProcessor(tests.BaseTestCase):
+class TestThresholdProcessor(tests.BaseTestCase):
     def __init__(self, *args, **kwargs):
-        super(TestThresholdingProcessor, self).__init__(*args, **kwargs)
+        super(TestThresholdProcessor, self).__init__(*args, **kwargs)
         self.alarm_definition0 = json.dumps({
             "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
             "name": "Average CPU percent greater than 10",
@@ -474,7 +474,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         return list
 
     def setUp(self):
-        super(TestThresholdingProcessor, self).setUp()
+        super(TestThresholdProcessor, self).setUp()
 
     def test__init_(self):
         """Test processor _init_.
@@ -486,22 +486,22 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         """
         tp = None
         try:
-            tp = processor.ThresholdingProcessor(self.alarm_definition0)
+            tp = processor.ThresholdProcessor(self.alarm_definition0)
         except Exception:
             tp = None
-        self.assertIsInstance(tp, processor.ThresholdingProcessor)
+        self.assertIsInstance(tp, processor.ThresholdProcessor)
         try:
-            tp = processor.ThresholdingProcessor(self.alarm_definition1)
+            tp = processor.ThresholdProcessor(self.alarm_definition1)
         except Exception:
             tp = None
-        self.assertIsInstance(tp, processor.ThresholdingProcessor)
+        self.assertIsInstance(tp, processor.ThresholdProcessor)
         try:
-            tp = processor.ThresholdingProcessor(self.alarm_definition2)
+            tp = processor.ThresholdProcessor(self.alarm_definition2)
         except Exception:
             tp = None
-        self.assertIsInstance(tp, processor.ThresholdingProcessor)
+        self.assertIsInstance(tp, processor.ThresholdProcessor)
         try:
-            tp = processor.ThresholdingProcessor(self.alarm_definition3)
+            tp = processor.ThresholdProcessor(self.alarm_definition3)
         except Exception:
             tp = None
         self.assertIsNone(tp)
@@ -511,7 +511,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
 
         # test utf8 dimensions and compound logic expr
         # init processor
-        tp = processor.ThresholdingProcessor(self.alarm_definition0)
+        tp = processor.ThresholdProcessor(self.alarm_definition0)
         # send metrics to the processor
         metrics_list = self.get_metric0()
         for metrics in metrics_list:
@@ -523,7 +523,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
 
         # test more than 1 periods
-        tp = processor.ThresholdingProcessor(self.alarm_definition0)
+        tp = processor.ThresholdProcessor(self.alarm_definition0)
         metrics_list = self.get_metric0()
         for metrics in metrics_list[0:2]:
             tp.process_metrics(metrics)
@@ -531,7 +531,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         print (alarms)
         self.assertEqual(0, len(alarms))
         self.assertEqual('UNDETERMINED', tp.expr_data_queue[None]['state'])
-        tp = processor.ThresholdingProcessor(self.alarm_definition2)
+        tp = processor.ThresholdProcessor(self.alarm_definition2)
         metrics_list = self.get_metric2_0()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -539,7 +539,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         print (alarms)
         self.assertEqual(1, len(alarms))
         self.assertEqual('OK', json.loads(alarms[0])['state'])
-        tp = processor.ThresholdingProcessor(self.alarm_definition2)
+        tp = processor.ThresholdProcessor(self.alarm_definition2)
         metrics_list = self.get_metric2_1()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -548,7 +548,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         self.assertEqual(1, len(alarms))
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
         print (json.loads(alarms[0])['sub_alarms'][0]['current_values'])
-        tp = processor.ThresholdingProcessor(self.alarm_definition2)
+        tp = processor.ThresholdProcessor(self.alarm_definition2)
         metrics_list = self.get_metric2_2()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -557,7 +557,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         self.assertEqual(0, len(alarms))
 
         # test alarms with match_up
-        tp = processor.ThresholdingProcessor(self.alarm_definition1)
+        tp = processor.ThresholdProcessor(self.alarm_definition1)
         metrics_list = self.get_metric1()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -569,7 +569,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         self.assertEqual('OK', tp.expr_data_queue['h3,']['state'])
 
         # test alarms with multiple match_ups
-        tp = processor.ThresholdingProcessor(self.alarm_definition5)
+        tp = processor.ThresholdProcessor(self.alarm_definition5)
         metrics_list = self.get_metric5()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -578,7 +578,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         self.assertEqual(3, len(alarms))
 
         # test alarms with metrics having more dimensions
-        tp = processor.ThresholdingProcessor(self.alarm_definition4)
+        tp = processor.ThresholdProcessor(self.alarm_definition4)
         metrics_list = self.get_metric4()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -590,7 +590,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
 
         # test when receiving wrong format metrics
-        tp = processor.ThresholdingProcessor(self.alarm_definition1)
+        tp = processor.ThresholdProcessor(self.alarm_definition1)
         metrics_list = self.get_metric_wrong_1()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -602,7 +602,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
                          ['sub_alarms'][0]['current_values'])
 
         # test when received metrics dimension not match
-        tp = processor.ThresholdingProcessor(self.alarm_definition1)
+        tp = processor.ThresholdProcessor(self.alarm_definition1)
         alarms = tp.process_alarms()
         print (alarms)
         metrics_list = self.get_metric_not_match()
@@ -613,7 +613,7 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         self.assertEqual('OK', json.loads(alarms[0])['state'])
 
         # test a success update alarm definition
-        tp = processor.ThresholdingProcessor(self.alarm_definition1)
+        tp = processor.ThresholdProcessor(self.alarm_definition1)
         metrics_list = self.get_metric1()
         for metrics in metrics_list:
             tp.process_metrics(metrics)
@@ -624,6 +624,6 @@ class TestThresholdingProcessor(tests.BaseTestCase):
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(3, len(alarms))
-        tp = processor.ThresholdingProcessor(self.alarm_definition2)
+        tp = processor.ThresholdProcessor(self.alarm_definition2)
         re = tp.update_thresh_processor(self.alarm_definition2_update)
         self.assertEqual(True, re)

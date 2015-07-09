@@ -32,7 +32,7 @@ reasons = {'ALARM': 'The alarm threshold(s) have '
            'UNDETERMINED': 'Unable to determine the alarm state'}
 
 
-class ThresholdingProcessor(object):
+class ThresholdProcessor(object):
     """Thresh processor.
 
     This processor is for alarm definitions with short period.
@@ -62,7 +62,7 @@ class ThresholdingProcessor(object):
     def __init__(self, alarm_def):
         """One processor instance hold one alarm definition."""
         LOG.debug('initializing ThresholdProcessor!')
-        super(ThresholdingProcessor, self).__init__()
+        super(ThresholdProcessor, self).__init__()
         self.alarm_definition = json.loads(alarm_def)
         self.expression = self.alarm_definition['expression']
         self.match_by = self.alarm_definition['match_by']

@@ -17,23 +17,23 @@
 import json
 import mock
 from monasca.common import kafka_conn
-from monasca.microservice import thresholding_engine as engine
+from monasca.microservice import threshold_engine as engine
 from oslo.config import fixture as fixture_config
 from oslotest import base
 from stevedore import driver
 
 
-class TestThresholdingEngine(base.BaseTestCase):
+class TestThresholdEngine(base.BaseTestCase):
     def setUp(self):
         self.CONF = self.useFixture(fixture_config.Config()).conf
         self.CONF.kafka_opts.uri = 'fake_url'
-        self.CONF.thresholding_engine.metrics_topic = 'fake_metrics'
-        self.CONF.thresholding_engine.definition_topic = (
+        self.CONF.thresholdengine.metrics_topic = 'fake_metrics'
+        self.CONF.thresholdengine.definition_topic = (
             'fake_alarmdefinitions')
-        self.CONF.thresholding_engine.alarm_topic = 'fake_alarms'
-        self.CONF.thresholding_engine.check_alarm_interval = 10
-        super(TestThresholdingEngine, self).setUp()
-        self.thresh_engine = engine.ThresholdingEngine()
+        self.CONF.thresholdengine.alarm_topic = 'fake_alarms'
+        self.CONF.thresholdengine.check_alarm_interval = 10
+        super(TestThresholdEngine, self).setUp()
+        self.thresh_engine = engine.ThresholdEngine()
 
     def test_initialization(self):
         # Test Kafka connection uri and topic
