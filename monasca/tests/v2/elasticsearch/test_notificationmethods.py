@@ -75,7 +75,7 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
 
     def setUp(self):
         self.CONF = self.useFixture(fixture_config.Config()).conf
-        self.CONF.notifi_method.doc_type = 'fake'
+        self.CONF.notificationmethods.doc_type = 'fake'
         self.CONF.es_conn.uri = 'fake_es_uri'
         super(TestNotificationMethodDispatcher, self).setUp()
         res = mock.Mock()
