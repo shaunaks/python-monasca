@@ -27,7 +27,7 @@ import time
 PROCESSOR_NAMESPACE = 'monasca.message.processor'
 lock = threading.RLock()
 
-th_opts = [
+TH_OPTS = [
     cfg.StrOpt('metrics_topic',
                default='metrics',
                help='topics to read metrics'),
@@ -44,10 +44,7 @@ th_opts = [
                default=60)
 ]
 
-th_group = cfg.OptGroup(name='thresholding_engine',
-                        title='thresholding_engine')
-cfg.CONF.register_group(th_group)
-cfg.CONF.register_opts(th_opts, th_group)
+cfg.CONF.register_opts(TH_OPTS, group="thresholding_engine")
 
 LOG = log.getLogger(__name__)
 

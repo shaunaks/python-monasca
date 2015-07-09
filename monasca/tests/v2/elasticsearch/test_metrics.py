@@ -78,6 +78,7 @@ class TestMetricDispatcher(base.BaseTestCase):
         self.CONF = self.useFixture(fixture_config.Config()).conf
         self.CONF.set_override('uri', 'fake_url', group='kafka_opts')
         self.CONF.set_override('topic', 'fake', group='metrics')
+        self.CONF.set_override('doc_type', 'fake', group='metrics')
         self.CONF.set_override('index_prefix', 'also_fake', group='metrics')
         self.CONF.set_override('uri', 'fake_es_uri', group='es_conn')
 

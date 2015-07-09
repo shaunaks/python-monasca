@@ -38,6 +38,8 @@ STRATEGY_NAMESPACE = 'monasca.index.strategy'
 METRICS_OPTS = [
     cfg.StrOpt('topic', default='metrics',
                help='The topic that metrics will be published to.'),
+    cfg.StrOpt('doc_type', default='metrics',
+               help='The doc type that metrics will be saved into.'),
     cfg.StrOpt('index_strategy', default='fixed',
                help='The index strategy used to create index name.'),
     cfg.StrOpt('index_prefix', default='data_',
@@ -134,6 +136,7 @@ class MetricDispatcher(object):
         LOG.debug('initializing V2API!')
         super(MetricDispatcher, self).__init__()
         self.topic = cfg.CONF.metrics.topic
+        self.doc_type = cfg.CONF.metrics.doc_type
         self.size = cfg.CONF.metrics.size
         self._kafka_conn = kafka_conn.KafkaConnection(self.topic)
 
@@ -151,7 +154,7 @@ class MetricDispatcher(object):
         self.index_prefix = cfg.CONF.metrics.index_prefix
 
         self._es_conn = es_conn.ESConnection(
-            self.topic, self.index_strategy, self.index_prefix)
+            self.doc_type, self.index_strategy, self.index_prefix)
 
         # Setup the get metrics query body pattern
         self._query_body = {
