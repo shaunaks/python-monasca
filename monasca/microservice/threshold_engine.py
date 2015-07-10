@@ -17,6 +17,7 @@
 
 import json
 from monasca.common import kafka_conn
+from monasca.common import namespace
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
 from oslo.config import cfg
@@ -24,7 +25,6 @@ from stevedore import driver
 import threading
 import time
 
-PROCESSOR_NAMESPACE = 'monasca.message.processor'
 lock = threading.RLock()
 
 THRESHOLD_ENGINE_OPTS = [
@@ -156,7 +156,7 @@ class AlarmDefinitionConsumer(threading.Thread):
             # init a processor for this alarm definition
             temp_processor = (
                 driver.DriverManager(
-                    PROCESSOR_NAMESPACE,
+                    namespace.PROCESSOR_NS,
                     cfg.CONF.thresholdengine.processor,
                     invoke_on_load=True,
                     invoke_args=(msg.message.value,)).driver)

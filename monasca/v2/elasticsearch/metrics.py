@@ -23,6 +23,7 @@ import time
 
 from monasca.common import es_conn
 from monasca.common import kafka_conn
+from monasca.common import namespace
 from monasca.common import resource_api
 from monasca.openstack.common import log
 from monasca.openstack.common import timeutils as tu
@@ -32,8 +33,6 @@ try:
 except ImportError:
     import json
 
-
-STRATEGY_NAMESPACE = 'monasca.index.strategy'
 
 METRICS_OPTS = [
     cfg.StrOpt('topic', default='metrics',
@@ -143,7 +142,7 @@ class MetricDispatcher(object):
         # load index strategy
         if cfg.CONF.metrics.index_strategy:
             self.index_strategy = driver.DriverManager(
-                STRATEGY_NAMESPACE,
+                namespace.STRATEGY_NS,
                 cfg.CONF.metrics.index_strategy,
                 invoke_on_load=True,
                 invoke_kwds={}).driver

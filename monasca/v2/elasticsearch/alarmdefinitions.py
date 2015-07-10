@@ -22,6 +22,7 @@ from stevedore import driver
 import uuid
 
 from monasca.common import es_conn
+from monasca.common import namespace
 from monasca.common import resource_api
 from monasca.openstack.common import log
 
@@ -48,7 +49,6 @@ alarmdefinitions_opts = [
 cfg.CONF.register_opts(alarmdefinitions_opts, group='alarmdefinitions')
 
 STATES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
-STRATEGY_NAMESPACE = 'monasca.index.strategy'
 
 LOG = log.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class AlarmDefinitionDispatcher(object):
         # load index strategy
         if cfg.CONF.alarmdefinitions.index_strategy:
             self.index_strategy = driver.DriverManager(
-                STRATEGY_NAMESPACE,
+                namespace.STRATEGY_NS,
                 cfg.CONF.alarmdefinitions.index_strategy,
                 invoke_on_load=True,
                 invoke_kwds={}).driver

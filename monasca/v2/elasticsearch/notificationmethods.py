@@ -22,10 +22,9 @@ from stevedore import driver
 import uuid
 
 from monasca.common import es_conn
+from monasca.common import namespace
 from monasca.common import resource_api
 from monasca.openstack.common import log
-
-STRATEGY_NAMESPACE = 'monasca.index.strategy'
 
 try:
     import ujson as json
@@ -111,7 +110,7 @@ class NotificationMethodDispatcher(object):
         # load index strategy
         if cfg.CONF.notificationmethods.index_strategy:
             self.index_strategy = driver.DriverManager(
-                STRATEGY_NAMESPACE,
+                namespace.STRATEGY_NS,
                 cfg.CONF.notificationmethods.index_strategy,
                 invoke_on_load=True,
                 invoke_kwds={}).driver

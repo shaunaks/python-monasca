@@ -20,12 +20,9 @@ from stevedore import driver
 
 from monasca.common import es_conn
 from monasca.common import kafka_conn
+from monasca.common import namespace
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
-
-
-PROCESSOR_NAMESPACE = 'monasca.message.processor'
-STRATEGY_NAMESPACE = 'monasca.index.strategy'
 
 OPTS = [
     cfg.StrOpt('topic', default='metrics',
@@ -61,7 +58,7 @@ class ESPersister(os_service.Service):
         # load index strategy
         if cfg.CONF.es_persister.index_strategy:
             self.index_strategy = driver.DriverManager(
-                STRATEGY_NAMESPACE,
+                namespace.STRATEGY_NS,
                 cfg.CONF.es_persister.index_strategy,
                 invoke_on_load=True,
                 invoke_kwds={}).driver
@@ -83,7 +80,7 @@ class ESPersister(os_service.Service):
         # load message processor
         if cfg.CONF.es_persister.processor:
             self.msg_processor = driver.DriverManager(
-                PROCESSOR_NAMESPACE,
+                namespace.PROCESSOR_NS,
                 cfg.CONF.es_persister.processor,
                 invoke_on_load=True,
                 invoke_kwds={}).driver

@@ -22,10 +22,9 @@ import paste.deploy
 from stevedore import named
 
 
+from monasca.common import namespace
 from monasca.common import resource_api
 from monasca.openstack.common import log
-
-DISPATCHER_NAMESPACE = 'monasca.dispatcher'
 
 OPTS = [
     cfg.MultiStrOpt('dispatcher',
@@ -44,14 +43,14 @@ def api_app(conf):
     log.setup('monasca')
 
     dispatcher_manager = named.NamedExtensionManager(
-        namespace=DISPATCHER_NAMESPACE,
+        namespace=namespace.DISPATCHER_NS,
         names=cfg.CONF.dispatcher,
         invoke_on_load=True,
         invoke_args=[cfg.CONF])
 
     if not list(dispatcher_manager):
         LOG.error('Failed to load any dispatchers for %s' %
-                  DISPATCHER_NAMESPACE)
+                  namespace.DISPATCHER_NS)
         return None
 
     # Create the application

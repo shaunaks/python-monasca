@@ -18,11 +18,11 @@
 from oslo.config import cfg
 from stevedore import driver
 
+from monasca.common import namespace
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
 from monasca import service
 
-SERVICE_NAMESPACE = 'monasca.microservice'
 
 OPTS = [
     cfg.StrOpt('service',
@@ -46,14 +46,14 @@ def main():
 
     # Now load the micro service
     service_driver = driver.DriverManager(
-        SERVICE_NAMESPACE,
+        namespace.MICROSERVICE_NS,
         cfg.CONF.service,
         invoke_on_load=True,
         invoke_kwds={'threads': cfg.CONF.threads})
 
     if not service_driver.driver:
         LOG.error('Failed loading micro service under name space %s.%s' %
-                  (SERVICE_NAMESPACE, cfg.CONF.service))
+                  (namespace.MICROSERVICE_NS, cfg.CONF.service))
         return None
 
     LOG.debug("Micro service %s is now loaded." %
