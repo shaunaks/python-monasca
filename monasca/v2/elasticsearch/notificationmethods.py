@@ -16,6 +16,7 @@
 
 import ast
 import falcon
+import json
 from oslo.config import cfg
 import re
 from stevedore import driver
@@ -25,11 +26,6 @@ from monasca.common import es_conn
 from monasca.common import namespace
 from monasca.common import resource_api
 from monasca.openstack.common import log
-
-try:
-    import ujson as json
-except ImportError:
-    import json
 
 
 NOTIFICATION_METHOD_OPTS = [
@@ -225,23 +221,46 @@ class NotificationMethodDispatcher(object):
             if request_type == 'DEL':
                 return self._es_conn.del_messages(id)
 
-    @resource_api.Restify('/v2.0/notification-methods/{id}', method='get')
-    def do_get_notification_methods(self, req, res, id):
+    @resource_api.Restify('/v2.0/notification-methods/', method='get')
+    def do_get_notification_methods(self, req, res):
         LOG.debug("The notification_methods GET request is received!")
-        LOG.debug("---------------")
-        LOG.debug(id)
 
-        # Setup the get notification method query url,
-        # the url should be similar to this:
-        # http://host:port/data_20141201/notification_methods/
-        # _search?size=10000?q=_id:35cc6f1c-3a29-49fb-a6fc-d9d97d190508
-        # the url should be made of es_conn uri, the index prefix, notification
-        # dispatcher topic, then add the key word _search.
-        # self._query_url = ''.join([self._es_conn.uri,
-        #                           self._es_conn.index_prefix, '/',
-        #                           cfg.CONF.notificationmethods.doc_type,
-        #         '/_search?size=', str(self.size), '&q=_id:', id])
-        #
+        es_res = self._es_conn.get_messages({})
+        res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
+
+        LOG.debug('Query to ElasticSearch returned: %s' % es_res.status_code)
+
+        es_res = self._get_notification_method_response(es_res)
+        LOG.debug('Query to ElasticSearch returned: %s' % es_res)
+
+        res_data = es_res["hits"]
+        if res_data:
+            def _make_body(elements):
+                yield '{"links": [{"rel": "self", "href":"'
+                yield req.uri + '"}],'
+                yield '"elements": ['
+                first = True
+                for element in elements:
+                    if element['_source']:
+                        if not first:
+                            yield ','
+                        else:
+                            first = False
+                        links = [{"rel": "self",
+                                  "href": req.uri + "/" +
+                                  element['_source']['id']}]
+                        element['_source']['links'] = links
+                        yield json.dumps(element['_source'])
+                yield ']}'
+
+            res.body = ''.join(_make_body(res_data))
+        else:
+            res.body = ''
+        res.content_type = 'application/json;charset=utf-8'
+
+    @resource_api.Restify('/v2.0/notification-methods/{id}', method='get')
+    def do_get_notification_method_by_id(self, req, res, id):
+        LOG.debug("The notification_methods GET by id request is received!")
 
         es_res = self._es_conn.get_message_by_id(id)
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
@@ -251,16 +270,13 @@ class NotificationMethodDispatcher(object):
         es_res = self._get_notification_method_response(es_res)
         LOG.debug('Query to ElasticSearch returned: %s' % es_res)
 
-        res_data = es_res["hits"][0]
-        if res_data:
-            # convert the response into monasca notification_methods format
-            res.body = json.dumps([{
-                "id": id,
-                "links": [{"rel": "self",
-                           "href": req.uri}],
-                "name": res_data["_source"]["name"],
-                "type":res_data["_source"]["type"],
-                "address":res_data["_source"]["address"]}])
+        if es_res and es_res.get('hits'):
+            res_data = es_res['hits'][0]
+            obj = res_data['_source']
+            obj['id'] = id
+            obj['links'] = [{"rel": "self",
+                             "href": req.uri}]
+            res.body = json.dumps(obj)
             res.content_type = 'application/json;charset=utf-8'
         else:
             res.body = ''

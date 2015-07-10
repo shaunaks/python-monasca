@@ -24,10 +24,7 @@ import requests
 from monasca.common import es_conn
 from monasca.v2.elasticsearch import notificationmethods
 
-try:
-    import ujson as json
-except ImportError:
-    import json
+import json
 
 response_str = """
     {
@@ -155,9 +152,30 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
             np = notificationmethods.NotificationMethodDispatcher({})
             np.handle_notification_msg(msg)
 
-    def test_do_get_notifications(self):
+    def test_do_get_notification_methods(self):
         res = mock.Mock()
         req = mock.Mock()
+        req.uri = 'some url'
+
+        req_result = mock.Mock()
+
+        req_result.json.return_value = json.loads(response_str)
+        req_result.status_code = 200
+
+        with mock.patch.object(requests, 'post', return_value=req_result):
+            self.dispatcher_get.do_get_notification_methods(req, res)
+
+        # test that the response code is 200
+        self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
+        obj = json.loads(res.body)
+        self.assertTrue(obj['links'])
+        self.assertTrue(obj['elements'])
+        self.assertEqual(len(obj['elements']), 1)
+
+    def test_do_get_notification_method_by_id(self):
+        res = mock.Mock()
+        req = mock.Mock()
+        req.uri = 'some url'
 
         req_result = mock.Mock()
 
@@ -166,18 +184,17 @@ class TestNotificationMethodDispatcher(base.BaseTestCase):
 
         with mock.patch.object(requests, 'get', return_value=req_result):
             (self.dispatcher_get.
-                do_get_notification_methods(
+                do_get_notification_method_by_id(
                     req, res,
                     id="c60ec47e-5038-4bf1-9f95-4046c6e9a719"))
 
         # test that the response code is 200
         self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
         obj = json.loads(res.body)
-        self.assertEqual(obj[0]['id'], 'c60ec47e-5038-4bf1-9f95-4046c6e9a719')
-        self.assertEqual(obj[0]['type'], 'EMAIL')
-        self.assertEqual(obj[0]['name'], 'NotificationMethod')
-        self.assertEqual(obj[0]['address'], 'hanc@andrew.cmu.edu')
-        self.assertEqual(len(obj), 1)
+        self.assertEqual(obj['id'], 'c60ec47e-5038-4bf1-9f95-4046c6e9a719')
+        self.assertEqual(obj['type'], 'EMAIL')
+        self.assertEqual(obj['name'], 'NotificationMethod')
+        self.assertEqual(obj['address'], 'hanc@andrew.cmu.edu')
 
     def test_do_post_notifications(self):
         with mock.patch.object(
