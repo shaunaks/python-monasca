@@ -18,227 +18,62 @@ import json
 from monasca.common import alarm_expr_validator as validator
 from monasca.openstack.common import log
 from monasca import tests
-
+import os
 
 LOG = log.getLogger(__name__)
 
 
-class TestAlarmExprCalculator(tests.BaseTestCase):
-    def __init__(self, *args, **kwargs):
-        super(TestAlarmExprCalculator, self).__init__(*args, **kwargs)
-        self.alarm_definition0 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression":
-                "max(-_.千幸福的笑脸{घोड़ा=馬,  "
-                "dn2=dv2,"
-                "千幸福的笑脸घ=千幸福的笑脸घ}) gte 100 "
-                "times 1 And "
-                "(min(ເຮືອນ{dn3=dv3,家=дом}) < 10 "
-                "or sum(biz{dn5=dv58}) >9 9and "
-                "count(fizzle) lt 0 or count(baz) > 1)",
-            "match_by": [],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition0_wrong0 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression":
-                "max(-_.千幸福的笑脸{घोड़ा=馬,  "
-                "dn2=dv2,"
-                "千幸福的笑脸घ=千幸福的笑脸घ}) gte 100 "
-                "times 1 And "
-                "(min(ເຮືອນ{dn3=dv3,家=дом}) < 10 "
-                "or sum(biz{dn5=dv58}) >9 9and "
-                "count(fizzle) lt 0 or count(baz) > 1)",
-            "match_by": [],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition0_wrong1 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression":
-                "max(-_.千幸福的笑脸{घोड़ा=馬,  "
-                "dn2=dv2,"
-                "千幸福的笑脸घ=千幸福的笑脸घ}) gte 100 "
-                "times 1 And "
-                "(min(ເຮືອນ{dn3=dv3,家=дом}) < 10 "
-                "or sum(biz=5{dn5=dv58}) >9 9and "
-                "count(fizzle) lt 0 or count(baz) > 1)",
-            "match_by": [],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "max(biz{key2=value2})>1400",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1_update = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "min(biz{key2=value2})<1450",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1_update_wrong0 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "min(biz{key2=value1})<1450",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1_update_wrong1 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "min(biz{key2=value2})<1450",
-            "match_by": [
-                "os"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1_update_wrong2 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "min(biz{key2=value2})<1450 and max(baz)<500",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1_update_wrong3 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "min(baz{key2=value2})<1450",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
+class TestCaseUtil():
+    def __init__(self):
+        path = os.path.split(os.path.realpath(__file__))[0]
+        path += '/test_case_alarm_expr_validator.json'
+        f = open(path)
+        try:
+            self.test_cases = json.load(f)
+        finally:
+            f.close()
 
+    def get_alarm_def(self, name):
+        return json.dumps(self.test_cases[name])
+
+
+class TestAlarmExprCalculator(tests.BaseTestCase):
     def setUp(self):
         super(TestAlarmExprCalculator, self).setUp()
+        self.util = TestCaseUtil()
 
     def test_is_valid_alarm_definition(self):
         self.assertEqual(True, validator.is_valid_alarm_definition(
-            self.alarm_definition1))
+            self.util.get_alarm_def("alarm_def_1")))
         self.assertEqual(True, validator.is_valid_alarm_definition(
-            self.alarm_definition0))
+            self.util.get_alarm_def("alarm_def_0")))
         self.assertEqual(True, validator.is_valid_alarm_definition(
-            self.alarm_definition1_update))
+            self.util.get_alarm_def("alarm_def_1_update")))
         self.assertEqual(True, validator.is_valid_alarm_definition(
-            self.alarm_definition1_update_wrong0))
+            self.util.get_alarm_def("alarm_def_1_update_wrong_0")))
         self.assertEqual(False, validator.is_valid_alarm_definition(
-            self.alarm_definition0_wrong0))
+            self.util.get_alarm_def("alarm_def_0_wrong_0")))
         self.assertEqual(False, validator.is_valid_alarm_definition(
-            self.alarm_definition0_wrong1))
+            self.util.get_alarm_def("alarm_def_0_wrong_1")))
         self.assertEqual(True, validator.is_valid_alarm_definition(
-            self.alarm_definition1_update_wrong1))
+            self.util.get_alarm_def("alarm_def_1_update_wrong_1")))
 
     def test_is_valid_update_alarm_definition(self):
         self.assertEqual(True, validator.is_valid_update_alarm_definition(
-            self.alarm_definition1, self.alarm_definition1_update))
+            self.util.get_alarm_def("alarm_def_1"),
+            self.util.get_alarm_def("alarm_def_1_update")))
         self.assertEqual(False, validator.is_valid_update_alarm_definition(
-            self.alarm_definition1, self.alarm_definition0_wrong0))
+            self.util.get_alarm_def("alarm_def_1"),
+            self.util.get_alarm_def("alarm_def_0_wrong_0")))
         self.assertEqual(False, validator.is_valid_update_alarm_definition(
-            self.alarm_definition1, self.alarm_definition1_update_wrong0))
+            self.util.get_alarm_def("alarm_def_1"),
+            self.util.get_alarm_def("alarm_def_1_update_wrong_0")))
         self.assertEqual(False, validator.is_valid_update_alarm_definition(
-            self.alarm_definition1, self.alarm_definition1_update_wrong1))
+            self.util.get_alarm_def("alarm_def_1"),
+            self.util.get_alarm_def("alarm_def_1_update_wrong_1")))
         self.assertEqual(False, validator.is_valid_update_alarm_definition(
-            self.alarm_definition1, self.alarm_definition1_update_wrong2))
+            self.util.get_alarm_def("alarm_def_1"),
+            self.util.get_alarm_def("alarm_def_1_update_wrong_2")))
         self.assertEqual(False, validator.is_valid_update_alarm_definition(
-            self.alarm_definition1, self.alarm_definition1_update_wrong3))
+            self.util.get_alarm_def("alarm_def_1"),
+            self.util.get_alarm_def("alarm_def_1_update_wrong_3")))

@@ -63,7 +63,7 @@ class ThresholdProcessor(object):
         """One processor instance hold one alarm definition."""
         LOG.debug('initializing ThresholdProcessor!')
         super(ThresholdProcessor, self).__init__()
-        self.alarm_definition = json.loads(alarm_def)
+        self.alarm_definition = alarm_def
         self.expression = self.alarm_definition['expression']
         self.match_by = self.alarm_definition['match_by']
         self.expr_data_queue = {}
@@ -103,7 +103,7 @@ class ThresholdProcessor(object):
                         'values': []}
 
         LOG.debug('update ThresholdProcessor!')
-        new_alarm_definition = json.loads(alarm_def)
+        new_alarm_definition = alarm_def
         new_expression = new_alarm_definition['expression']
         alarm_parser = parser.AlarmExprParser(new_expression)
         new_sub_expr_list = alarm_parser.sub_expr_list
