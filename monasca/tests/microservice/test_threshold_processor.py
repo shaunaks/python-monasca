@@ -19,462 +19,36 @@ from monasca.microservice import threshold_processor as processor
 from monasca.openstack.common import log
 from monasca.openstack.common import timeutils as tu
 from monasca import tests
+import os
 
 LOG = log.getLogger(__name__)
 
 
+class TestCaseUtil():
+    def __init__(self):
+        path = os.path.split(os.path.realpath(__file__))[0]
+        path += '/test_case_threshold_processor.json'
+        f = open(path)
+        try:
+            self.test_cases = json.load(f)
+        finally:
+            f.close()
+
+    def get_alarm_def(self, name):
+        return self.test_cases["alarm_def"][name]
+
+    def get_metrics(self, name):
+        ts = self.test_cases["metrics"][name]
+        for t in ts:
+            o = t["time_offset"]
+            t["timestamp"] = tu.iso8601_from_timestamp(tu.utcnow_ts() + o)
+            yield json.dumps(t)
+
+
 class TestThresholdProcessor(tests.BaseTestCase):
-    def __init__(self, *args, **kwargs):
-        super(TestThresholdProcessor, self).__init__(*args, **kwargs)
-        self.alarm_definition0 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression":
-                "max(-_.千幸福的笑脸{घोड़ा=馬,  "
-                "dn2=dv2,"
-                "千幸福的笑脸घ=千幸福的笑脸घ}) gte 100 "
-                "times 1 And "
-                "(min(ເຮືອນ{dn3=dv3,家=дом}) < 10 "
-                "or sum(biz{dn5=dv58}) >9 9and "
-                "count(fizzle) lt 0 or count(baz) > 1)",
-            "match_by": [],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "max(biz{key2=value2})>1400",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition1_update = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "min(biz{key2=value2})<1450",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition4 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "avg(biz{key2=value2})>1400",
-            "match_by": [
-                "hostname"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition2 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "max(foo)>=100 times 4",
-            "match_by": [],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition2_update = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "max(foo,80)>=100 times 6",
-            "match_by": [],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition3 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "max(foo{hostname=mini-mon"
-                          ",千=千}, 120)"
-                          " = 100 and (max(bar)>100 "
-                          " or max(biz)>100)",
-            "match_by": [],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-        self.alarm_definition5 = json.dumps({
-            "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
-            "name": "Average CPU percent greater than 10",
-            "description":
-                "The average CPU percent is greater than 10",
-            "expression": "avg(biz{key2=value2})>1400",
-            "match_by": [
-                "hostname",
-                "system"
-            ],
-            "severity": "LOW",
-            "ok_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "alarm_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ],
-            "undetermined_actions": [
-                "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
-            ]})
-
-    def get_metric2_0(self):
-        list = []
-        for i in range(0, 10, 1):
-            metrics = {"name": "foo",
-                       "dimensions": {
-                           "key1": "value1",
-                           "key2": "value2"
-                       },
-                       "timestamp":
-                           tu.iso8601_from_timestamp(
-                               tu.utcnow_ts() + i * 20 - 140),
-                       "value": i * 10}
-            list.append(json.dumps(metrics))
-        return list
-
-    def get_metric2_1(self):
-        list = []
-        for i in range(10, 30, 1):
-            metrics = {"name": "foo",
-                       "dimensions": {
-                           "key1": "value1",
-                           "key2": "value2"
-                       },
-                       "timestamp":
-                           tu.iso8601_from_timestamp(
-                               tu.utcnow_ts() + i * 20 - 570),
-                       "value": i * 75}
-            list.append(json.dumps(metrics))
-        return list
-
-    def get_metric2_2(self):
-        list = []
-        for i in range(0, 10, 1):
-            metrics = {"name": "foo",
-                       "dimensions": {
-                           "key1": "value1",
-                           "key2": "value2"
-                       },
-                       "timestamp":
-                           tu.iso8601_from_timestamp(
-                               tu.utcnow_ts() + i * 20 - 140),
-                       "value": i * 10 + 200}
-            list.append(json.dumps(metrics))
-        return list
-
-    def get_metric1(self):
-        list = []
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1300}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key1": "value1",
-                       "key2": "value2",
-                       "key3": "value3"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1500}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h2",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1500}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h3",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1200}
-        list.append(json.dumps(metrics))
-        return list
-
-    def get_metric4(self):
-        list = []
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts() - 200),
-                   "value": 1300}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key2": "value2",
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts() - 30),
-                   "value": 1200}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key1": "value1",
-                       "key2": "value2",
-                       "key3": "value3"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1601}
-        list.append(json.dumps(metrics))
-        return list
-
-    def get_metric5(self):
-        list = []
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 2000}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "system": "windows",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1300}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "system": "linux",
-                       "key2": "value2",
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts() - 30),
-                   "value": 1200}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "system": "windows",
-                       "key1": "value1",
-                       "key2": "value2",
-                       "key3": "value3"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1601}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h2",
-                       "system": "linux",
-                       "key1": "value1",
-                       "key2": "value2",
-                       "key3": "value3"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1601}
-        list.append(json.dumps(metrics))
-        return list
-
-    def get_metric0(self):
-        list = []
-        metrics = {"name": "baz",
-                   "dimensions": {
-                       "घोड़ा": "馬",
-                       "dn2": "dv2",
-                       "千幸福的笑脸घ": "千幸福的笑脸घ"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1500}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "-_.千幸福的笑脸",
-                   "dimensions": {
-                       "घोड़ा": "馬",
-                       "dn2": "dv2",
-                       "千幸福的笑脸घ": "千幸福的笑脸घ"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1500}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "ເຮືອນ",
-                   "dimensions": {
-                       "dn3": "dv3",
-                       "家": "дом"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 5}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "dn5": "dv58"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 5}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "dn5": "dv58"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 95}
-        list.append(json.dumps(metrics))
-        return list
-
-    def get_metric_wrong_1(self):
-        list = []
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1300}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key1": "value1",
-                       "key2": "value2",
-                       "key3": "value3"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts())}
-        list.append(json.dumps(metrics))
-        return list
-
-    def get_metric_not_match(self):
-        list = []
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key2": "value2"
-                   },
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts()),
-                   "value": 1300}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key1": "value1",
-                       "key3": "value3"
-                   },
-                   'value': 15000,
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts())}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "hostname": "h1",
-                       "key2": "value1",
-                       "key3": "value3"
-                   },
-                   'value': 15000,
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts())}
-        list.append(json.dumps(metrics))
-        metrics = {"name": "biz",
-                   "dimensions": {
-                       "key2": "value1",
-                       "key3": "value3"
-                   },
-                   'value': 15000,
-                   "timestamp":
-                       tu.iso8601_from_timestamp(tu.utcnow_ts())}
-        list.append(json.dumps(metrics))
-        return list
-
     def setUp(self):
         super(TestThresholdProcessor, self).setUp()
+        self.util = TestCaseUtil()
 
     def test__init_(self):
         """Test processor _init_.
@@ -486,22 +60,26 @@ class TestThresholdProcessor(tests.BaseTestCase):
         """
         tp = None
         try:
-            tp = processor.ThresholdProcessor(self.alarm_definition0)
+            ad = self.util.get_alarm_def("alarm_def_utf8")
+            tp = processor.ThresholdProcessor(ad)
         except Exception:
             tp = None
         self.assertIsInstance(tp, processor.ThresholdProcessor)
         try:
-            tp = processor.ThresholdProcessor(self.alarm_definition1)
+            ad = self.util.get_alarm_def("alarm_def_match_by")
+            tp = processor.ThresholdProcessor(ad)
         except Exception:
             tp = None
         self.assertIsInstance(tp, processor.ThresholdProcessor)
         try:
-            tp = processor.ThresholdProcessor(self.alarm_definition2)
+            ad = self.util.get_alarm_def("alarm_def_periods")
+            tp = processor.ThresholdProcessor(ad)
         except Exception:
             tp = None
         self.assertIsInstance(tp, processor.ThresholdProcessor)
         try:
-            tp = processor.ThresholdProcessor(self.alarm_definition3)
+            ad = self.util.get_alarm_def("alarm_def_wrong")
+            tp = processor.ThresholdProcessor(ad)
         except Exception:
             tp = None
         self.assertIsNone(tp)
@@ -511,9 +89,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
 
         # test utf8 dimensions and compound logic expr
         # init processor
-        tp = processor.ThresholdProcessor(self.alarm_definition0)
+        ad = self.util.get_alarm_def("alarm_def_utf8")
+        tp = processor.ThresholdProcessor(ad)
         # send metrics to the processor
-        metrics_list = self.get_metric0()
+        metrics_list = self.util.get_metrics("metrics_utf8")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         # manually call the function to update alarms
@@ -523,24 +102,18 @@ class TestThresholdProcessor(tests.BaseTestCase):
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
 
         # test more than 1 periods
-        tp = processor.ThresholdProcessor(self.alarm_definition0)
-        metrics_list = self.get_metric0()
-        for metrics in metrics_list[0:2]:
-            tp.process_metrics(metrics)
-        alarms = tp.process_alarms()
-        print (alarms)
-        self.assertEqual(0, len(alarms))
-        self.assertEqual('UNDETERMINED', tp.expr_data_queue[None]['state'])
-        tp = processor.ThresholdProcessor(self.alarm_definition2)
-        metrics_list = self.get_metric2_0()
+        ad = self.util.get_alarm_def("alarm_def_periods")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_periods_0")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(1, len(alarms))
         self.assertEqual('OK', json.loads(alarms[0])['state'])
-        tp = processor.ThresholdProcessor(self.alarm_definition2)
-        metrics_list = self.get_metric2_1()
+        ad = self.util.get_alarm_def("alarm_def_periods")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_periods_1")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
@@ -548,8 +121,9 @@ class TestThresholdProcessor(tests.BaseTestCase):
         self.assertEqual(1, len(alarms))
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
         print (json.loads(alarms[0])['sub_alarms'][0]['current_values'])
-        tp = processor.ThresholdProcessor(self.alarm_definition2)
-        metrics_list = self.get_metric2_2()
+        ad = self.util.get_alarm_def("alarm_def_periods")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_periods_2")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
@@ -557,8 +131,9 @@ class TestThresholdProcessor(tests.BaseTestCase):
         self.assertEqual(0, len(alarms))
 
         # test alarms with match_up
-        tp = processor.ThresholdProcessor(self.alarm_definition1)
-        metrics_list = self.get_metric1()
+        ad = self.util.get_alarm_def("alarm_def_match_by")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_match_by")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
@@ -569,8 +144,9 @@ class TestThresholdProcessor(tests.BaseTestCase):
         self.assertEqual('OK', tp.expr_data_queue['h3,']['state'])
 
         # test alarms with multiple match_ups
-        tp = processor.ThresholdProcessor(self.alarm_definition5)
-        metrics_list = self.get_metric5()
+        ad = self.util.get_alarm_def("alarm_def_multi_match_by")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_multi_match_by")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
@@ -578,8 +154,9 @@ class TestThresholdProcessor(tests.BaseTestCase):
         self.assertEqual(3, len(alarms))
 
         # test alarms with metrics having more dimensions
-        tp = processor.ThresholdProcessor(self.alarm_definition4)
-        metrics_list = self.get_metric4()
+        ad = self.util.get_alarm_def("alarm_def_more_dimensions")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_more_dimensions")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
@@ -590,8 +167,9 @@ class TestThresholdProcessor(tests.BaseTestCase):
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
 
         # test when receiving wrong format metrics
-        tp = processor.ThresholdProcessor(self.alarm_definition1)
-        metrics_list = self.get_metric_wrong_1()
+        ad = self.util.get_alarm_def("alarm_def_match_by")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_match_by_wrong")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
@@ -602,10 +180,11 @@ class TestThresholdProcessor(tests.BaseTestCase):
                          ['sub_alarms'][0]['current_values'])
 
         # test when received metrics dimension not match
-        tp = processor.ThresholdProcessor(self.alarm_definition1)
+        ad = self.util.get_alarm_def("alarm_def_match_by")
+        tp = processor.ThresholdProcessor(ad)
         alarms = tp.process_alarms()
         print (alarms)
-        metrics_list = self.get_metric_not_match()
+        metrics_list = self.util.get_metrics("metrics_not_match")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
@@ -613,17 +192,21 @@ class TestThresholdProcessor(tests.BaseTestCase):
         self.assertEqual('OK', json.loads(alarms[0])['state'])
 
         # test a success update alarm definition
-        tp = processor.ThresholdProcessor(self.alarm_definition1)
-        metrics_list = self.get_metric1()
+        ad = self.util.get_alarm_def("alarm_def_match_by")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_match_by")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
-        re = tp.update_thresh_processor(self.alarm_definition1_update)
+        ad = self.util.get_alarm_def("alarm_def_match_by_update")
+        re = tp.update_thresh_processor(ad)
         self.assertEqual(True, re)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(3, len(alarms))
-        tp = processor.ThresholdProcessor(self.alarm_definition2)
-        re = tp.update_thresh_processor(self.alarm_definition2_update)
+        ad = self.util.get_alarm_def("alarm_def_periods")
+        tp = processor.ThresholdProcessor(ad)
+        ad = self.util.get_alarm_def("alarm_def_periods_update")
+        re = tp.update_thresh_processor(ad)
         self.assertEqual(True, re)
