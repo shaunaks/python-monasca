@@ -137,7 +137,7 @@ class AlarmDefinitionDispatcher(object):
                 }
             }
         else:
-            query = '*'
+            query = {}
         LOG.debug('Parsed Query: %s' % query)
         return query
 
