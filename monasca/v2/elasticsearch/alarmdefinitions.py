@@ -103,6 +103,7 @@ class AlarmDefinitionDispatcher(object):
         return None
 
     def _get_alarm_definitions_helper(self, query_string):
+        query = {}
         queries = []
         field_string = 'alarmdefinitions.expression_data.dimensions.'
         if query_string:
@@ -136,8 +137,7 @@ class AlarmDefinitionDispatcher(object):
                     }
                 }
             }
-        else:
-            query = {}
+
         LOG.debug('Parsed Query: %s' % query)
         return query
 
@@ -148,7 +148,7 @@ class AlarmDefinitionDispatcher(object):
         LOG.debug("Message: %s" % msg)
         post_msg = ast.literal_eval(msg)
 
-        # random uuid genearation for alarm definition
+        # random uuid generation for alarm definition
         id = str(uuid.uuid4())
         post_msg["id"] = id
         post_msg = AlarmDefinitionUtil.severityparsing(post_msg)
@@ -285,8 +285,8 @@ class AlarmDefinitionDispatcher(object):
             LOG.exception('Error occurred while handling Alarm '
                           'Definition Delete Request.')
 
-    @resource_api.Restify('/v2.0/alarm-definitions', method='get')
-    def do_get_alarm_definitions(self, req, res):
+    @resource_api.Restify('/v2.0/alarm-definitions/', method='get')
+    def do_get_alarm_definitions_filtered(self, req, res):
         LOG.debug('The alarm definitions GET request is received!')
 
         query_string = req.query_string
@@ -304,13 +304,13 @@ class AlarmDefinitionDispatcher(object):
         LOG.debug('Query to ElasticSearch returned: %s' % es_res)
 
         res.body = ''
+        result_elements = []
         try:
             if es_res["hits"]:
                 res_data = es_res["hits"]
-                res.body = '['
                 for current_alarm in res_data:
                     if current_alarm:
-                        res.body += json.dumps({
+                        result_elements.append({
                             "id": current_alarm["_source"]["id"],
                             "links": [{"rel": "self",
                                        "href": req.uri}],
@@ -332,9 +332,11 @@ class AlarmDefinitionDispatcher(object):
                             "undetermined_actions":
                                 current_alarm["_source"]
                             ["undetermined_actions"]})
-                        res.body += ','
-                res.body = res.body[:-1]
-                res.body += ']'
+
+                res.body = json.dumps({
+                    "links": [{"rel": "self", "href": req.uri}],
+                    "elements": result_elements
+                })
                 res.content_type = 'application/json;charset=utf-8'
         except Exception:
             LOG.exception('Error occurred while handling Alarm '

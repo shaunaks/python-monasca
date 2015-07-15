@@ -81,6 +81,7 @@ class AlarmDispatcher(object):
             return None
 
     def _get_alarms_helper(self, query_string):
+        query = {}
         queries = []
         field_string = 'alarms.metrics.dimensions.'
         if query_string:
@@ -114,8 +115,7 @@ class AlarmDispatcher(object):
                     }
                 }
             }
-        else:
-            query = {}
+
         LOG.debug('Parsed Query: %s' % query)
         return query
 
@@ -140,13 +140,14 @@ class AlarmDispatcher(object):
         LOG.debug('Query to ElasticSearch returned: %s' % es_res)
 
         res.body = ''
+        result_elements = []
         try:
             if es_res["hits"]:
                 res_data = es_res["hits"]
                 res.body = '['
                 for current_alarm in res_data:
                     if current_alarm:
-                        res.body += json.dumps({
+                        result_elements.append({
                             "id": current_alarm["_source"]["id"],
                             "links": [{"rel": "self",
                                        "href": req.uri}],
@@ -163,9 +164,10 @@ class AlarmDispatcher(object):
                             ["updated_timestamp"],
                             "created_timestamp": current_alarm["_source"]
                             ["created_timestamp"]})
-                        res.body += ','
-                res.body = res.body[:-1]
-                res.body += ']'
+                res.body = json.dumps({
+                    "links": [{"rel": "self", "href": req.uri}],
+                    "elements": result_elements
+                })
                 res.content_type = 'application/json;charset=utf-8'
         except Exception:
             LOG.exception('Error occurred while handling Alarms Get Request.')

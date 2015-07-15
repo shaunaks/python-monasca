@@ -76,7 +76,8 @@ class TestAlarmDispatcher(base.BaseTestCase):
 
         # test that the response code is 200
         self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
-        obj = json.loads(res.body)
+        json_result = json.loads(res.body)
+        obj = json_result['elements']
 
         # test that the first response object has the required properties
         self.assertEqual(obj[0]['id'],
