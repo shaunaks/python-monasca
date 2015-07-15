@@ -21,6 +21,7 @@ from monasca.common import namespace
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
 from oslo.config import cfg
+import requests
 from stevedore import driver
 import threading
 import time
@@ -31,9 +32,6 @@ THRESHOLD_ENGINE_OPTS = [
     cfg.StrOpt('metrics_topic',
                default='metrics',
                help='topics to read metrics'),
-    cfg.StrOpt('definition_topic',
-               default='alarmdefinitions',
-               help='topic to read alarm definitions'),
     cfg.StrOpt('alarm_topic',
                default='alarm',
                help='topic to send alarms'),
@@ -43,8 +41,20 @@ THRESHOLD_ENGINE_OPTS = [
     cfg.IntOpt('check_alarm_interval',
                default=60)
 ]
+ALARM_DEFINITION_OPTS = [
+    cfg.StrOpt('uri', default='0.0.0.0:0',
+               help='The uri of alarm definition API server.'),
+    cfg.StrOpt('name', default='',
+               help='The name for query alarm definitions.'),
+    cfg.StrOpt('dimensions', default='',
+               help='The dimensions for query alarm definitions.'),
+    cfg.IntOpt('check_alarm_def_interval',
+               default=120)
+]
+
 
 cfg.CONF.register_opts(THRESHOLD_ENGINE_OPTS, group="thresholdengine")
+cfg.CONF.register_opts(ALARM_DEFINITION_OPTS, group="alarmdefinitions")
 
 LOG = log.getLogger(__name__)
 
@@ -64,15 +74,15 @@ class AlarmPublisher(threading.Thread):
             kafka_conn.KafkaConnection(topic))
         # set time interval for calling processors to refresh alarms
         self.interval = cfg.CONF.thresholdengine.check_alarm_interval
-        self.thresholding_processors = tp
+        self.threshold_processors = tp
 
     def send_alarm(self):
         if self._publish_kafka_conn:
             if lock.acquire():
-                for processor in self.thresholding_processors:
+                for aid in self.threshold_processors:
                     # get alarms produced by each processor
-                    for alarm in (self.thresholding_processors
-                                  [processor].process_alarms()):
+                    for alarm in (self.threshold_processors
+                                  [aid]['processor'].process_alarms()):
                         LOG.debug(alarm)
                         self._publish_kafka_conn.send_messages(alarm)
             lock.release()
@@ -102,14 +112,14 @@ class MetricsConsumer(threading.Thread):
         self._consume_kafka_conn = None
         topic = cfg.CONF.thresholdengine.metrics_topic
         self._consume_kafka_conn = kafka_conn.KafkaConnection(topic)
-        self.thresholding_processors = tp
+        self.threshold_processors = tp
 
     def read_metrics(self):
         def consume_metrics():
             if lock.acquire():
-                # read metrics from kafka and deliver it to each processor
-                for alarm_def in self.thresholding_processors:
-                    processor = self.thresholding_processors[alarm_def]
+                # send metrics to each processor
+                for aid in self.threshold_processors:
+                    processor = self.threshold_processors[aid]['processor']
                     processor.process_metrics(msg.message.value)
             lock.release()
 
@@ -140,17 +150,44 @@ class AlarmDefinitionConsumer(threading.Thread):
     """
     def __init__(self, t_name, tp):
         threading.Thread.__init__(self, name=t_name)
-        # init kafka connection to alarm definition topic
-        self._consume_kafka_conn = None
-        topic = cfg.CONF.thresholdengine.definition_topic
-        self._consume_kafka_conn = (
-            kafka_conn.KafkaConnection(topic))
-        self.thresholding_processors = tp
 
-    def read_alarm_def(self):
+        # build the http request string
+        # http://192.168.10.4:8080/v2.0/alarm-definitions?name=&dimensions=
+        self.request = ('http://' +
+                        cfg.CONF.alarmdefinitions.uri +
+                        '/v2.0/alarm-definitions')
+        # build the http request params
+        self.params = {}
+        if cfg.CONF.alarmdefinitions.name:
+            self.params['name'] = cfg.CONF.alarmdefinitions.name
+        if cfg.CONF.alarmdefinitions.dimensions:
+            self.params['dimensions'] = cfg.CONF.alarmdefinitions.dimensions
+        # get the dict where all processors are indexed
+        self.threshold_processors = tp
+        # get the time interval to query es
+        self.interval = cfg.CONF.alarmdefinitions.check_alarm_def_interval
+        # set the flag, which is used to determine if a processor is expired
+        # each processor will has its flag, if same with self.flag, it's valid
+        self.flag = 0
+
+    def get_alarm_definitions(self):
+        """Get alarm definitions by calling API server."""
+        res = requests.get(self.request, params=self.params)
+        if res.status_code != 200:
+            LOG.debug('Cannot get alarm definitions from API server!')
+            return None
+        text = res.text
+        LOG.debug(text)
+        if text:
+            json_text = json.loads(text)
+            if 'elements' in json_text:
+                return json_text['elements']
+        return []
+
+    def refresh_alarm_processors(self):
         def create_alarm_processor():
             # make sure received a new alarm definition
-            if temp_alarm_def['id'] in self.thresholding_processors:
+            if aid in self.threshold_processors:
                 LOG.debug('already exsist alarm definition')
                 return
             # init a processor for this alarm definition
@@ -159,83 +196,91 @@ class AlarmDefinitionConsumer(threading.Thread):
                     namespace.PROCESSOR_NS,
                     cfg.CONF.thresholdengine.processor,
                     invoke_on_load=True,
-                    invoke_args=(msg.message.value,)).driver)
+                    invoke_args=(alarm_def,)).driver)
             # register this new processor
-            if lock.acquire():
-                self.thresholding_processors[temp_alarm_def['id']] = (
-                    temp_processor)
-            lock.release()
+            self.threshold_processors[aid] = {}
+            self.threshold_processors[aid]['processor'] = (
+                temp_processor)
+            self.threshold_processors[aid]['flag'] = self.flag
+            self.threshold_processors[aid]['json'] = alarm_def
 
         def update_alarm_processor():
             # update the processor when alarm definition is changed
-            if lock.acquire():
-                updated = False
-                if temp_alarm_def['id'] in self.thresholding_processors:
-                    updated = (self.thresholding_processors
-                               [temp_alarm_def['id']]
-                               .update_thresh_processor(msg.message.value))
-                if updated:
-                    LOG.debug('alarm definition updates successfully!')
-                else:
-                    LOG.debug('alarm definition update fail!')
-            lock.release()
+            updated = False
+            if aid in self.threshold_processors:
+                updated = (self.threshold_processors
+                           [aid]['processor']
+                           .update_thresh_processor(alarm_def))
+                self.threshold_processors[aid]['json'] = alarm_def
+            if updated:
+                LOG.debug('alarm definition updates successfully!')
+            else:
+                LOG.debug('alarm definition update fail!')
 
         def delete_alarm_processor():
             # delete related processor when an alarm definition is deleted
-            if lock.acquire():
-                if temp_alarm_def['id'] in self.thresholding_processors:
-                    self.thresholding_processors.pop(temp_alarm_def['id'])
-            lock.release()
+            if aid in self.threshold_processors:
+                self.threshold_processors.pop(aid)
 
-        # get alarm definition message and check the request type
-        if self._consume_kafka_conn:
-            for msg in self._consume_kafka_conn.get_messages():
-                if msg and msg.message:
-                    LOG.debug(msg.message.value)
-                    temp_alarm_def = json.loads(msg.message.value)
-                    if temp_alarm_def['request'] == 'POST':
-                        create_alarm_processor()
-                    elif temp_alarm_def['request'] == 'PUT':
+        self.flag = 1 - self.flag
+        # get all alarm definitions from es to update those in the engine
+        alarm_definitions = self.get_alarm_definitions()
+        # http request fails, do nothing
+        if alarm_definitions is None:
+            return
+        if lock.acquire():
+            for alarm_def in alarm_definitions:
+                aid = alarm_def['id']
+                if aid in self.threshold_processors:
+                    # alarm definition is updated
+                    if alarm_def != self.threshold_processors[aid]['json']:
                         update_alarm_processor()
-                    elif temp_alarm_def['request'] == 'DEL':
-                        delete_alarm_processor()
-            self._consume_kafka_conn.commit()
+                    self.threshold_processors[aid]['flag'] = self.flag
+                else:
+                    # comes a new alarm definition
+                    create_alarm_processor()
+            for aid in self.threshold_processors.keys():
+                if self.threshold_processors[aid]['flag'] != self.flag:
+                    # the alarm definition is expired
+                    delete_alarm_processor()
+        lock.release()
 
     def run(self):
         while True:
             try:
-                self.read_alarm_def()
+                self.refresh_alarm_processors()
+                time.sleep(self.interval)
             except Exception:
                 LOG.exception('Error occurred '
-                              'while reading alarm def messages.')
+                              'while reading alarm definitions.')
 
     def stop(self):
-        self._consume_kafka_conn.close()
+        pass
 
 
 class ThresholdEngine(os_service.Service):
     def __init__(self, threads=1000):
         super(ThresholdEngine, self).__init__(threads)
         # dict to index all the processors,
-        # key = alarm def id; value = processor object
-        self.thresholding_processors = {}
+        # key = alarm def id; value = processor
+        self.threshold_processors = {}
         # init threads for processing metrics, alarm definition and alarm
         try:
             self.thread_alarm = AlarmPublisher(
                 'alarm_publisher',
-                self.thresholding_processors)
+                self.threshold_processors)
         except Exception:
             self.thread_alarm = None
         try:
             self.thread_alarm_def = AlarmDefinitionConsumer(
                 'alarm_def_consumer',
-                self.thresholding_processors)
+                self.threshold_processors)
         except Exception:
             self.thread_alarm_def = None
         try:
             self.thread_metrics = MetricsConsumer(
                 'metrics_consumer',
-                self.thresholding_processors)
+                self.threshold_processors)
         except Exception:
             self.thread_metrics = None
 

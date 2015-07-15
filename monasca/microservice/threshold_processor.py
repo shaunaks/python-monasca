@@ -14,6 +14,7 @@
 # under the License.
 
 import collections
+import copy
 import json
 from monasca.common import alarm_expr_calculator as calculator
 from monasca.common import alarm_expr_parser as parser
@@ -287,7 +288,7 @@ class ThresholdProcessor(object):
         else:
             self.related_metrics[name] = []
             for m in self.related_metrics[None]:
-                temp = m.copy()
+                temp = copy.deepcopy(m)
                 for match in self.match_by:
                     temp['dimensions'][match] = data['dimensions'][match]
                 self.related_metrics[name].append(temp)
