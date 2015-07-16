@@ -123,16 +123,15 @@ class TestAlarmDispatcher(base.BaseTestCase):
         obj = json.loads(res.body)
 
         # test that the response object has the required properties
-        self.assertEqual(obj[0]['id'],
+        self.assertEqual(obj['id'],
                          "d718fb26-d16d-4705-8f02-13a1468619c9")
-        self.assertNotEqual(obj[0]['metrics'], None)
-        self.assertEqual(obj[0]['state'], 'OK')
-        self.assertNotEqual(obj[0]['sub_alarms'], None)
-        self.assertEqual(obj[0]['created_timestamp'], '2015-06-17T18:43:21Z')
-        self.assertEqual(obj[0]['updated_timestamp'], '2015-06-17T18:43:27Z')
-        self.assertEqual(obj[0]['state_updated_timestamp'],
+        self.assertNotEqual(obj['metrics'], None)
+        self.assertEqual(obj['state'], 'OK')
+        self.assertNotEqual(obj['sub_alarms'], None)
+        self.assertEqual(obj['created_timestamp'], '2015-06-17T18:43:21Z')
+        self.assertEqual(obj['updated_timestamp'], '2015-06-17T18:43:27Z')
+        self.assertEqual(obj['state_updated_timestamp'],
                          '2015-06-17T18:43:27Z')
-        self.assertEqual(len(obj), 1)
 
     def test_do_put_alarms(self):
         req = mock.Mock()

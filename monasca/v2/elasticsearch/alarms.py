@@ -100,6 +100,9 @@ class AlarmDispatcher(object):
                                 'query': current_dimen_data[1]
                             }
                         })
+                elif current_param_split[0] in ['limit', 'offset']:
+                    # ignore these two parameter until we support pagination
+                    pass
                 else:
                     queries.append({
                         'query_string': {
@@ -168,8 +171,11 @@ class AlarmDispatcher(object):
                     "links": [{"rel": "self", "href": req.uri}],
                     "elements": result_elements
                 })
-                res.content_type = 'application/json;charset=utf-8'
+            else:
+                res.body = ''
+            res.content_type = 'application/json;charset=utf-8'
         except Exception:
+            res.status = getattr(falcon, 'HTTP_400')
             LOG.exception('Error occurred while handling Alarms Get Request.')
 
     @resource_api.Restify('/v2.0/alarms/{id}', method='get')
@@ -190,7 +196,7 @@ class AlarmDispatcher(object):
             if es_res["hits"]:
                 res_data = es_res["hits"][0]
                 if res_data:
-                    res.body = json.dumps([{
+                    res.body = json.dumps({
                         "id": id,
                         "links": [{"rel": "self",
                                    "href": req.uri}],
@@ -202,7 +208,7 @@ class AlarmDispatcher(object):
                         "updated_timestamp":
                             res_data["_source"]["updated_timestamp"],
                         "created_timestamp":
-                            res_data["_source"]["created_timestamp"]}])
+                            res_data["_source"]["created_timestamp"]})
 
                     res.content_type = 'application/json;charset=utf-8'
             else:
