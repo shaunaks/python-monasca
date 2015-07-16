@@ -41,7 +41,7 @@ class TestCaseUtil():
         ts = self.test_cases["metrics"][name]
         for t in ts:
             o = t["time_offset"]
-            t["timestamp"] = tu.iso8601_from_timestamp(tu.utcnow_ts() + o)
+            t["timestamp"] = tu.utcnow_ts() + o
             yield json.dumps(t)
 
 
