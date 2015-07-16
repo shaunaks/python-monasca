@@ -78,15 +78,16 @@ To start a Monasca micro service servers, run the following command:
     monasca-service --config-file /etc/monasca/alarms-persister.conf
 
     Notification service:
-    monasca-service --config-file /etc/monasca/monasca-notification.conf
+    monasca-service --config-file /etc/monasca/monasca-notification-engine.conf
 
+    Threshold service:
+    monasca-service --config-file /etc/monasca/monasca-threshold-engine.conf
 
 In the future, there might be other services such as threshold engine,
 anomaly detection, alarms etc. All these services should be able to take
 a specific configuration file to be launched. Here are the examples:
 
     monasca-service --config-file /etc/monasca/monasca-anomaly.conf
-    monasca-service --config-file /etc/monasca/monasca-threshold.conf
 
 To start the monasca ui server, run the following command
 
@@ -107,12 +108,10 @@ The installation of these two projects can be found here:
 Once both projects are installed, some configurations are needed:
 
     Copy _60_monitoring.py to Horizon openstack_dashboard/local/enabled directory
-    
+
     Run the following command to create service and endpoint
-    
-    keystone service-create --name=monitoring --type=monitoring --description="Monasca monitoring service"
-    
-    keystone endpoint-create --region RegionOne --service-id=15d93347201d405cb8c44910e7be6f58 --publicurl=http://192.168.1.190:9090/v2.0 --internalurl=http://192.168.1.190:9090/v2.0 --adminurl=http://192.168.1.190/v2.0
+
+    setup_horizon.sh
 
 
 Monasca Development
