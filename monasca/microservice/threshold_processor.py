@@ -20,7 +20,6 @@ from monasca.common import alarm_expr_calculator as calculator
 from monasca.common import alarm_expr_parser as parser
 from monasca.openstack.common import log
 from monasca.openstack.common import timeutils as tu
-import time
 import uuid
 
 
@@ -210,9 +209,7 @@ class ThresholdProcessor(object):
                         expr.normalized_operator,
                         float(expr.threshold)))
 
-        t_now = tu.iso8601_from_timestamp(tu.utcnow_ts())
-        t_now = tu.parse_isotime(t_now).timetuple()
-        t_now = time.mktime(t_now)
+        t_now = tu.utcnow_ts()
         _update_metrics()
         _update_state()
 
@@ -253,9 +250,7 @@ class ThresholdProcessor(object):
                 data_list = temp['data'][expr.fmtd_sub_expr_str]
                 data_list['metrics'].append(
                     {'value': float(data['value']),
-                     'timestamp':
-                         time.mktime(tu.parse_isotime(
-                             data['timestamp']).timetuple())})
+                     'timestamp': float(data['timestamp'])})
 
         if _has_match_expr():
             _add_metrics()
