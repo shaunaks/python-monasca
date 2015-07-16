@@ -142,21 +142,20 @@ class TestAlarmDefinitionDispatcher(base.BaseTestCase):
         # test that the response code is 200
         self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
         obj = json.loads(res.body)
-        self.assertEqual(obj[0]['id'],
+        self.assertEqual(obj['id'],
                          "72df5ccb-ec6a-4bb4-a15c-939467ccdde0")
-        self.assertEqual(obj[0]['name'], "CPU usage test")
-        self.assertEqual(obj[0]['alarm_actions'],
+        self.assertEqual(obj['name'], "CPU usage test")
+        self.assertEqual(obj['alarm_actions'],
                          "c60ec47e-5038-4bf1-9f95-4046c6e9a719")
-        self.assertEqual(obj[0]['undetermined_actions'],
+        self.assertEqual(obj['undetermined_actions'],
                          "c60ec47e-5038-4bf1-9t95-4046c6e9a759")
-        self.assertEqual(obj[0]['ok_actions'],
+        self.assertEqual(obj['ok_actions'],
                          "c60ec47e-5038-4bf1-9f95-4046cte9a759")
-        self.assertEqual(obj[0]['match_by'], "hostname")
-        self.assertEqual(obj[0]['severity'], "LOW")
-        self.assertEqual(obj[0]['expression'],
+        self.assertEqual(obj['match_by'], "hostname")
+        self.assertEqual(obj['severity'], "LOW")
+        self.assertEqual(obj['expression'],
                          "max(cpu.usage{os=linux},600)>15")
-        self.assertEqual(obj[0]['description'], "Max CPU 15")
-        self.assertEqual(len(obj), 1)
+        self.assertEqual(obj['description'], "Max CPU 15")
 
     def test_do_post_alarm_definitions(self):
         req = mock.Mock()

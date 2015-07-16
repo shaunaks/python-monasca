@@ -122,6 +122,9 @@ class AlarmDefinitionDispatcher(object):
                                 'query': current_dimen_data[1]
                             }
                         })
+                elif current_param_split[0] in ['limit', 'offset']:
+                    # ignore the limit and offset for now.
+                    pass
                 else:
                     queries.append({
                         'query_string': {
@@ -174,7 +177,9 @@ class AlarmDefinitionDispatcher(object):
             except Exception:
                 LOG.exception('Error occurred while handling '
                               'Alarm Definition Post Request.')
+                res.status = getattr(falcon, 'HTTP_400')
         else:
+            LOG.error('Alarm definition is not valid.')
             res.status = getattr(falcon, 'HTTP_400')
 
     @resource_api.Restify('/v2.0/alarm-definitions/{id}', method='get')
@@ -195,7 +200,7 @@ class AlarmDefinitionDispatcher(object):
             if es_res["hits"]:
                 res_data = es_res["hits"][0]
                 if res_data:
-                    res.body = json.dumps([{
+                    res.body = json.dumps({
                         "id": id,
                         "links": [{"rel": "self",
                                    "href": req.uri}],
@@ -209,7 +214,7 @@ class AlarmDefinitionDispatcher(object):
                         "alarm_actions": res_data["_source"]["alarm_actions"],
                         "ok_actions": res_data["_source"]["ok_actions"],
                         "undetermined_actions": res_data["_source"]
-                        ["undetermined_actions"]}])
+                        ["undetermined_actions"]})
                     res.content_type = 'application/json;charset=utf-8'
         except Exception:
             LOG.exception('Error occurred while handling Alarm Definition '
@@ -337,7 +342,9 @@ class AlarmDefinitionDispatcher(object):
                     "links": [{"rel": "self", "href": req.uri}],
                     "elements": result_elements
                 })
-                res.content_type = 'application/json;charset=utf-8'
+            else:
+                res.body = ""
+            res.content_type = 'application/json;charset=utf-8'
         except Exception:
             LOG.exception('Error occurred while handling Alarm '
                           'Definitions Get Request.')
