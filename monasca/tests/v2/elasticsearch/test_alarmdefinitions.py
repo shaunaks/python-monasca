@@ -16,6 +16,7 @@
 
 import falcon
 import mock
+import os
 from oslo.config import fixture as fixture_config
 from oslotest import base
 import requests
@@ -27,45 +28,6 @@ try:
     import ujson as json
 except ImportError:
     import json
-
-
-response_str = """
-            {
-                "hits":{
-                    "hits":[
-                        {
-                            "_score":1.0,
-                            "_type":"alarmdefinitions",
-                            "_id":"72df5ccb-ec6a-4bb4-a15c-939467ccdde0",
-                            "_source":{
-                                "id":"72df5ccb-ec6a-4bb4-a15c-939467ccdde0",
-                                "name":"CPU usage test",
-                                "alarm_actions":
-                                "c60ec47e-5038-4bf1-9f95-4046c6e9a719",
-                                "undetermined_actions":
-                                "c60ec47e-5038-4bf1-9t95-4046c6e9a759",
-                                "ok_actions":
-                                "c60ec47e-5038-4bf1-9f95-4046cte9a759",
-                                "match_by":"hostname",
-                                "severity":"LOW",
-                                "expression":
-                                "max(cpu.usage{os=linux},600)>15",
-                                "description": "Max CPU 15"
-                            },
-                            "_index":"data_20150601000000"
-                        }
-                    ],
-                    "total":1,
-                    "max_score":1.0
-                },
-                "_shards":{
-                    "successful":5,
-                    "failed":0,
-                    "total":5
-                },
-                "took":2,
-            }
-        """
 
 
 class TestAlarmDefinitionUtil(base.BaseTestCase):
@@ -82,32 +44,12 @@ class TestAlarmDefinitionDispatcher(base.BaseTestCase):
         self.CONF.set_override('doc_type', 'fake', group='alarmdefinitions')
         self.CONF.set_override('uri', 'fake_es_uri', group='es_conn')
         super(TestAlarmDefinitionDispatcher, self).setUp()
-        res = mock.Mock()
-        res.status_code = 200
-        res.json.return_value = {
-            "id": "72df5ccb-ec6a-4bb4-a15c-939467ccdde0",
-            "links": [
-                {
-                    "rel": "self",
-                    "href": "http://127.0.0.1:9090/v2.0/alarm-definitions/"
-                            "72df5ccb-ec6a-4bb4-a15c-939467ccdde0"
-                }
-            ],
-            "name": "CPU usage test",
-            "alarm_actions": "c60ec47e-5038-4bf1-9f95-4046c6e9a719",
-            "undetermined_actions": "c60ec47e-5038-4bf1-9t95-4046c6e9a759",
-            "ok_actions": "c60ec47e-5038-4bf1-9f95-4046cte9a759",
-            "match_by": "hostname",
-            "severity": "LOW",
-            "expression": "max(cpu.usage{os=linux},600)>15",
-            "description": "Max CPU 15"
-        }
-        with mock.patch.object(requests, 'get',
-                               return_value=res):
-            self.dispatcher_get = (
-                alarmdefinitions.AlarmDefinitionDispatcher({}))
 
-        res.json.return_value = {}
+        self.dispatcher_get = (
+            alarmdefinitions.AlarmDefinitionDispatcher({}))
+
+        self.dispatcher_get_by_id = (
+            alarmdefinitions.AlarmDefinitionDispatcher({}))
 
         self.dispatcher_post = (
             alarmdefinitions.AlarmDefinitionDispatcher({}))
@@ -118,6 +60,12 @@ class TestAlarmDefinitionDispatcher(base.BaseTestCase):
         self.dispatcher_delete = (
             alarmdefinitions.AlarmDefinitionDispatcher({}))
 
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        alarms_data_json = open(os.path.join(dir_path,
+                                             'test_alarmdefinitions_data')
+                                ).read().replace('\n', '')
+        self.data = json.loads(alarms_data_json)
+
     def test_initialization(self):
         # test that the doc type of the es connection is fake
         self.assertEqual(self.dispatcher_get._es_conn.doc_type, 'fake')
@@ -127,14 +75,68 @@ class TestAlarmDefinitionDispatcher(base.BaseTestCase):
     def test_do_get_alarm_definitions(self):
         res = mock.Mock()
         req = mock.Mock()
+        req_result = mock.Mock()
+        response_str = self.data
+        req_result.json.return_value = response_str
+        req_result.status_code = 200
+
+        req.query_string = 'name=CPU usage test&dimensions=os:linux'
+        with mock.patch.object(es_conn.ESConnection, 'get_messages',
+                               return_value=req_result):
+            self.dispatcher_get.do_get_alarm_definitions_filtered(req, res)
+
+        # test that the response code is 200
+        self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
+        json_result = json.loads(res.body)
+        obj = json_result['elements']
+
+        # test that the first response object has the required properties
+        self.assertEqual(obj[0]['id'],
+                         '8c85be40-bfcb-465c-b450-4eea670806a6')
+        self.assertEqual(obj[0]['name'], "CPU usage test")
+        self.assertEqual(obj[0]['alarm_actions'],
+                         "c60ec47e-5038-4bf1-9f95-4046c6e9a719")
+        self.assertEqual(obj[0]['undetermined_actions'],
+                         "c60ec47e-5038-4bf1-9t95-4046c6e9a759")
+        self.assertEqual(obj[0]['ok_actions'],
+                         "c60ec47e-5038-4bf1-9f95-4046cte9a759")
+        self.assertEqual(obj[0]['match_by'], "hostname")
+        self.assertEqual(obj[0]['severity'], "LOW")
+        self.assertEqual(obj[0]['expression'],
+                         "max(cpu.usage{os=linux},600)>15")
+        self.assertNotEqual(obj[0]['expression_data'], None)
+        self.assertEqual(obj[0]['description'], "Max CPU 15")
+
+        # test that the second response object has the required properties
+        self.assertEqual(obj[1]['id'],
+                         'eb43fe12-b442-40b6-aab6-f34450cf90dd')
+        self.assertEqual(obj[1]['name'], "CPU usage in last 4 minutes")
+        self.assertEqual(obj[1]['alarm_actions'],
+                         "c60ec47e-5038-4bf1-9f95-4046c6e9a719")
+        self.assertEqual(obj[1]['undetermined_actions'],
+                         "c60ec47e-5038-4bf1-9t95-4046c6e9a759")
+        self.assertEqual(obj[1]['ok_actions'],
+                         "c60ec47e-5038-4bf1-9f95-4046cte9a759")
+        self.assertEqual(obj[1]['match_by'], "hostname")
+        self.assertEqual(obj[1]['severity'], "LOW")
+        self.assertEqual(obj[1]['expression'],
+                         "max(cpu.usage,60)>10 times 4")
+        self.assertNotEqual(obj[1]['expression_data'], None)
+        self.assertEqual(obj[1]['description'],
+                         "max CPU greater than 10")
+        self.assertEqual(len(obj), 2)
+
+    def test_do_get_alarm_definitions_by_id(self):
+        res = mock.Mock()
+        req = mock.Mock()
 
         req_result = mock.Mock()
 
-        req_result.json.return_value = json.loads(response_str)
+        req_result.json.return_value = self.data
         req_result.status_code = 200
 
         with mock.patch.object(requests, 'get', return_value=req_result):
-            self.dispatcher_get.do_get_alarm_definitions(
+            self.dispatcher_get_by_id.do_get_alarm_definitions_by_id(
                 req, res, id="72df5ccb-ec6a-4bb4-a15c-939467ccdde0")
 
         # test that the response code is 200
@@ -191,30 +193,36 @@ class TestAlarmDefinitionDispatcher(base.BaseTestCase):
         res = mock.Mock()
         req_result = mock.Mock()
         req_result.status_code = 200
+        req_get_result = mock.Mock()
 
-        with mock.patch.object(requests, 'put', return_value=req_result):
-            with mock.patch.object(req.stream, 'read',
-                                   return_value="{ 'name': 'CPU usage test', "
-                                                "'alarm_actions': "
-                                                "'c60ec47e-5038-4bf1-9f95-"
-                                                "4046c6e9a719', "
-                                                "'undetermined_actions': "
-                                                "'c60ec47e-5038-4bf1-9t95-"
-                                                "4046c6e9a759', 'ok_actions':"
-                                                " 'c60ec47e-5038-4bf1-9f95-"
-                                                "4046cte9a759', "
-                                                "'match_by': 'hostname', "
-                                                "'severity': 'LOW', "
-                                                "'expression': "
-                                                "'max(cpu.usage{os=linux},"
-                                                "600)"
-                                                ">15', 'description': "
-                                                "'Max CPU 15'"
-                                                "}"
-                                   ):
-                self.dispatcher_put.do_put_alarm_definitions(
-                    req, res, id="72df5ccb-ec6a-4bb4-a15c-939467ccdde0")
-                self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
+        req_get_result.json.return_value = self.data
+        req_get_result.status_code = 200
+
+        with mock.patch.object(requests, 'get', return_value=req_get_result):
+            with mock.patch.object(requests, 'put', return_value=req_result):
+                with mock.patch.object(
+                        req.stream, 'read',
+                        return_value="{ 'name': 'CPU usage test', "
+                                     "'alarm_actions': "
+                                     "'c60ec47e-5038-4bf1-9f95-"
+                                     "4046c6e9a719', "
+                                     "'undetermined_actions': "
+                                     "'c60ec47e-5038-4bf1-9t95-"
+                                     "4046c6e9a759', 'ok_actions':"
+                                     " 'c60ec47e-5038-4bf1-9f95-"
+                                     "4046cte9a759', "
+                                     "'match_by': 'hostname', "
+                                     "'severity': 'LOW', "
+                                     "'expression': "
+                                     "'max(cpu.usage{os=linux},"
+                                     "600)"
+                                     ">15', 'description': "
+                                     "'Max CPU 15'"
+                                     "}"
+                ):
+                    self.dispatcher_put.do_put_alarm_definitions(
+                        req, res, id="8c85be40-bfcb-465c-b450-4eea670806a6")
+                    self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
 
     def test_do_delete_alarm_definitions(self):
         with mock.patch.object(es_conn.ESConnection, 'del_messages',
