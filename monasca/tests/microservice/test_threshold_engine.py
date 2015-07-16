@@ -20,6 +20,7 @@ from monasca.common import kafka_conn
 from monasca.microservice import threshold_engine as engine
 from oslo.config import fixture as fixture_config
 from oslotest import base
+import requests
 from stevedore import driver
 
 
@@ -32,6 +33,10 @@ class TestThresholdEngine(base.BaseTestCase):
             'fake_alarmdefinitions')
         self.CONF.thresholdengine.alarm_topic = 'fake_alarms'
         self.CONF.thresholdengine.check_alarm_interval = 10
+        self.CONF.alarmdefinitions.uri = 'fake_http_url'
+        self.CONF.alarmdefinitions.dimensions = 'fake_key:fake_value'
+        self.CONF.alarmdefinitions.name = 'fake_name'
+        self.CONF.alarmdefinitions.check_alarm_def_interval = 120
         super(TestThresholdEngine, self).setUp()
         self.thresh_engine = engine.ThresholdEngine()
 
@@ -41,72 +46,83 @@ class TestThresholdEngine(base.BaseTestCase):
                          _consume_kafka_conn.uri, 'fake_url')
         self.assertEqual(self.thresh_engine.thread_metrics.
                          _consume_kafka_conn.topic, 'fake_metrics')
-        self.assertEqual(self.thresh_engine.thread_alarm_def.
-                         _consume_kafka_conn.uri, 'fake_url')
-        self.assertEqual(self.thresh_engine.thread_alarm_def.
-                         _consume_kafka_conn.topic, 'fake_alarmdefinitions')
+        self.assertEqual(self.thresh_engine.thread_alarm_def.request,
+                         'http://fake_http_url/v2.0/alarm-definitions')
+        self.assertEqual(self.thresh_engine.thread_alarm_def.params,
+                         {'name': 'fake_name',
+                          'dimensions': 'fake_key:fake_value'})
+        self.assertEqual(self.thresh_engine.thread_alarm_def.interval, 120)
         self.assertEqual(self.thresh_engine.thread_alarm.
                          _publish_kafka_conn.uri, 'fake_url')
         self.assertEqual(self.thresh_engine.thread_alarm.
                          _publish_kafka_conn.topic, 'fake_alarms')
         self.assertEqual(self.thresh_engine.thread_alarm.interval, 10)
 
-    def test_consume_alarm_def(self):
-        # test create new alarm definition
-        ad = [{'id': 'fake_id_1', 'request': 'POST'},
-              {'id': 'fake_id_2', 'request': 'POST'},
-              {'id': 'fake_id_2', 'request': 'POST'}]
-        alarm_def = [mock.Mock(), mock.Mock(), mock.Mock()]
-        for i in range(len(ad)):
-            alarm_def[i].message.value = json.dumps(ad[i])
+    def test_refresh_alarm_definitions(self):
+        # test refresh alarm definitions
+        ad = [{'id': 'fake_id_0', 'expression': 'fake_expr_0'},
+              {'id': 'fake_id_1', 'expression': 'fake_expr_1'},
+              {'id': 'fake_id_2', 'expression': 'fake_expr_2'}]
+        res = mock.Mock()
+        res.status_code = 200
+        res.text = json.dumps({'elements': ad})
         processor = mock.Mock()
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(kafka_conn.KafkaConnection,
-                                       'get_messages',
-                                       return_value=alarm_def):
-                    self.thresh_engine.thread_alarm_def.read_alarm_def()
-        print (self.thresh_engine.thread_alarm_def.thresholding_processors)
-        tp = self.thresh_engine.thread_alarm_def.thresholding_processors
-        self.assertEqual(2, len(tp))
+                with mock.patch.object(requests, 'get',
+                                       return_value=res):
+                    (self.thresh_engine.thread_alarm_def.
+                     refresh_alarm_processors())
+        print (self.thresh_engine.thread_alarm_def.threshold_processors)
+        tp = self.thresh_engine.thread_alarm_def.threshold_processors
+        self.assertEqual(3, len(tp))
         self.assertIn('fake_id_1', tp)
         self.assertIn('fake_id_2', tp)
         self.assertNotIn('fake_id_3', tp)
 
-        # test update alarm definition
-        ad = [{'id': 'fake_id_1', 'request': 'PUT'},
-              {'id': 'fake_id_2', 'request': 'PUT'},
-              {'id': 'fake_id_3', 'request': 'PUT'}]
-        alarm_def = [mock.Mock(), mock.Mock(), mock.Mock()]
-        for i in range(len(ad)):
-            alarm_def[i].message.value = json.dumps(ad[i])
-        with mock.patch.object(kafka_conn.KafkaConnection, 'get_messages',
-                               return_value=alarm_def):
-            self.thresh_engine.thread_alarm_def.read_alarm_def()
-        print (self.thresh_engine.thread_alarm_def.thresholding_processors)
-        tp = self.thresh_engine.thread_alarm_def.thresholding_processors
-        self.assertEqual(2, len(tp))
-        self.assertIn('fake_id_1', tp)
+        ad = [{'id': 'fake_id_3', 'expression': 'fake_expr_3'},
+              {'id': 'fake_id_1', 'expression': 'fake_expr_update'},
+              {'id': 'fake_id_2', 'expression': 'fake_expr_2'}]
+        res = mock.Mock()
+        res.status_code = 200
+        res.text = json.dumps({'elements': ad})
+        processor = mock.Mock()
+        with mock.patch.object(driver.DriverManager, '__init__',
+                               return_value=None):
+            with mock.patch.object(driver.DriverManager, 'driver',
+                                   return_value=processor):
+                with mock.patch.object(requests, 'get',
+                                       return_value=res):
+                    (self.thresh_engine.thread_alarm_def.
+                     refresh_alarm_processors())
+        print (self.thresh_engine.thread_alarm_def.threshold_processors)
+        tp = self.thresh_engine.thread_alarm_def.threshold_processors
+        self.assertEqual(3, len(tp))
+        self.assertNotIn('fake_id_0', tp)
         self.assertIn('fake_id_2', tp)
-        self.assertNotIn('fake_id_3', tp)
+        self.assertIn('fake_id_3', tp)
+        self.assertEqual('fake_expr_update',
+                         tp['fake_id_1']['json']['expression'])
 
-        # test delete alarm definition
-        ad = [{'id': 'fake_id_1', 'request': 'DEL'},
-              {'id': 'fake_id_3', 'request': 'DEL'}]
-        alarm_def = [mock.Mock(), mock.Mock()]
-        for i in range(len(ad)):
-            alarm_def[i].message.value = json.dumps(ad[i])
-        with mock.patch.object(kafka_conn.KafkaConnection, 'get_messages',
-                               return_value=alarm_def):
-            self.thresh_engine.thread_alarm_def.read_alarm_def()
-        print (self.thresh_engine.thread_alarm_def.thresholding_processors)
-        tp = self.thresh_engine.thread_alarm_def.thresholding_processors
-        self.assertEqual(1, len(tp))
-        self.assertNotIn('fake_id_1', tp)
-        self.assertIn('fake_id_2', tp)
-        self.assertNotIn('fake_id_3', tp)
+        # test http request fails
+        ad = []
+        res = mock.Mock()
+        res.status_code = 201
+        res.text = json.dumps({'elements': ad})
+        processor = mock.Mock()
+        with mock.patch.object(driver.DriverManager, '__init__',
+                               return_value=None):
+            with mock.patch.object(driver.DriverManager, 'driver',
+                                   return_value=processor):
+                with mock.patch.object(requests, 'get',
+                                       return_value=res):
+                    (self.thresh_engine.thread_alarm_def.
+                     refresh_alarm_processors())
+        print (self.thresh_engine.thread_alarm_def.threshold_processors)
+        tp = self.thresh_engine.thread_alarm_def.threshold_processors
+        self.assertEqual(3, len(tp))
 
     def test_consume_metrics(self):
         # test consume received metrics
@@ -123,56 +139,56 @@ class TestThresholdEngine(base.BaseTestCase):
         metrics = [mock.Mock(), mock.Mock(), mock.Mock()]
         for i in range(len(raw_metrics)):
             metrics[i].message.value = raw_metrics[i]
-        pre = self.thresh_engine.thread_metrics.thresholding_processors.copy()
+        pre = self.thresh_engine.thread_metrics.threshold_processors.copy()
         with mock.patch.object(kafka_conn.KafkaConnection, 'get_messages',
                                return_value=metrics):
             self.thresh_engine.thread_metrics.read_metrics()
         self.assertEqual(pre,
                          self.thresh_engine.thread_metrics.
-                         thresholding_processors)
+                         threshold_processors)
 
         # read one alarm definition and test consume metrics again
         processor = mock.Mock()
-        alarm_def = [mock.Mock()]
-        alarm_def[0].message.value = json.dumps(
-            {'id': 'fake_id_1', 'request': 'POST'})
+        res = mock.Mock()
+        res.status_code = 200
+        res.text = json.dumps({'elements': [{'id': 'fake_id_1'}]})
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(kafka_conn.KafkaConnection,
-                                       'get_messages',
-                                       return_value=alarm_def):
-                    self.thresh_engine.thread_alarm_def.read_alarm_def()
-        pre = self.thresh_engine.thread_metrics.thresholding_processors.copy()
+                with mock.patch.object(requests, 'get',
+                                       return_value=res):
+                    (self.thresh_engine.thread_alarm_def.
+                     refresh_alarm_processors())
+        pre = self.thresh_engine.thread_metrics.threshold_processors.copy()
         with mock.patch.object(kafka_conn.KafkaConnection, 'get_messages',
                                return_value=metrics):
             self.thresh_engine.thread_metrics.read_metrics()
         self.assertEqual(pre,
                          self.thresh_engine.thread_metrics.
-                         thresholding_processors)
-        print (self.thresh_engine.thread_metrics.thresholding_processors)
+                         threshold_processors)
+        print (self.thresh_engine.thread_metrics.threshold_processors)
 
     def test_publish_alarms(self):
         # read one alarm definition
         processor = mock.Mock()
-        alarm_def = [mock.Mock()]
-        alarm_def[0].message.value = json.dumps(
-            {'id': 'fake_id_1', 'request': 'POST'})
+        res = mock.Mock()
+        res.status_code = 200
+        res.text = json.dumps({'elements': [{'id': 'fake_id_1'}]})
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(kafka_conn.KafkaConnection,
-                                       'get_messages',
-                                       return_value=alarm_def):
-                    self.thresh_engine.thread_alarm_def.read_alarm_def()
+                with mock.patch.object(requests, 'get',
+                                       return_value=res):
+                    (self.thresh_engine.thread_alarm_def.
+                     refresh_alarm_processors())
 
         # test send alarms
-        pre = self.thresh_engine.thread_alarm.thresholding_processors.copy()
+        pre = self.thresh_engine.thread_alarm.threshold_processors.copy()
         with mock.patch.object(kafka_conn.KafkaConnection, 'send_messages',
                                return_value=None):
             self.thresh_engine.thread_alarm.send_alarm()
         self.assertEqual(pre,
                          self.thresh_engine.thread_alarm.
-                         thresholding_processors)
+                         threshold_processors)
