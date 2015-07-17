@@ -15,13 +15,12 @@
 # under the License.
 
 
-import json
+from monasca.common import es_conn
 from monasca.common import kafka_conn
 from monasca.common import namespace
 from monasca.openstack.common import log
 from monasca.openstack.common import service as os_service
 from oslo.config import cfg
-import requests
 from stevedore import driver
 import threading
 import time
@@ -42,8 +41,15 @@ THRESHOLD_ENGINE_OPTS = [
                default=60)
 ]
 ALARM_DEFINITION_OPTS = [
-    cfg.StrOpt('uri', default='0.0.0.0:0',
-               help='The uri of alarm definition API server.'),
+    cfg.StrOpt('doc_type', default='alarmdefinitions',
+               help='The doc_type that alarm definitions will be saved to.'),
+    cfg.StrOpt('index_strategy', default='fixed',
+               help='The index strategy used to create index name.'),
+    cfg.StrOpt('index_prefix', default='data_',
+               help='The index prefix where metrics were saved to.'),
+    cfg.IntOpt('size', default=1000,
+               help=('The query result limit. Any result set more than '
+                     'the limit will be discarded.')),
     cfg.StrOpt('name', default='',
                help='The name for query alarm definitions.'),
     cfg.StrOpt('dimensions', default='',
@@ -151,17 +157,21 @@ class AlarmDefinitionConsumer(threading.Thread):
     def __init__(self, t_name, tp):
         threading.Thread.__init__(self, name=t_name)
 
-        # build the http request string
-        # http://192.168.10.4:8080/v2.0/alarm-definitions?name=&dimensions=
-        self.request = ('http://' +
-                        cfg.CONF.alarmdefinitions.uri +
-                        '/v2.0/alarm-definitions')
-        # build the http request params
-        self.params = {}
-        if cfg.CONF.alarmdefinitions.name:
-            self.params['name'] = cfg.CONF.alarmdefinitions.name
-        if cfg.CONF.alarmdefinitions.dimensions:
-            self.params['dimensions'] = cfg.CONF.alarmdefinitions.dimensions
+        self.doc_type = cfg.CONF.alarmdefinitions.doc_type
+        self.size = cfg.CONF.alarmdefinitions.size
+        # load index strategy
+        if cfg.CONF.alarmdefinitions.index_strategy:
+            self.index_strategy = driver.DriverManager(
+                namespace.STRATEGY_NS,
+                cfg.CONF.alarmdefinitions.index_strategy,
+                invoke_on_load=True,
+                invoke_kwds={}).driver
+            LOG.debug(self.index_strategy)
+        else:
+            self.index_strategy = None
+        self.index_prefix = cfg.CONF.alarmdefinitions.index_prefix
+        self._es_conn = es_conn.ESConnection(
+            self.doc_type, self.index_strategy, self.index_prefix)
         # get the dict where all processors are indexed
         self.threshold_processors = tp
         # get the time interval to query es
@@ -169,20 +179,51 @@ class AlarmDefinitionConsumer(threading.Thread):
         # set the flag, which is used to determine if a processor is expired
         # each processor will has its flag, if same with self.flag, it's valid
         self.flag = 0
+        # setup query params
+        self.params = self._build_alarm_definitions_query(
+            cfg.CONF.alarmdefinitions.name,
+            cfg.CONF.alarmdefinitions.dimensions)
+
+    def _build_alarm_definitions_query(self, name, dimensions):
+        query = {}
+        queries = []
+        field_string = 'alarmdefinitions.expression_data.dimensions.'
+        if dimensions:
+            # add dimensions to query params
+            current_dimension_split = (
+                dimensions.split(','))
+            for current_dimension in current_dimension_split:
+                current_dimen_data = current_dimension.split(':')
+                queries.append({'query_string': {
+                    'default_field': (field_string +
+                                      current_dimen_data[0]),
+                    'query': current_dimen_data[1]}})
+        if name:
+            # add name to query params
+            queries.append({'query_string': {
+                'default_field': 'name', 'query': name}})
+        # finally build the query
+        query = {'query': {'bool': {'must': queries}}}
+        return query
+
+    def _get_alarm_definitions_response(self, res):
+        if res and res.status_code == 200:
+            obj = res.json()
+            if obj:
+                return obj.get('hits')
+        return None
 
     def get_alarm_definitions(self):
-        """Get alarm definitions by calling API server."""
-        res = requests.get(self.request, params=self.params)
-        if res.status_code != 200:
-            LOG.debug('Cannot get alarm definitions from API server!')
+        """Get alarm definitions from es."""
+        es_res = self._es_conn.get_messages(self.params)
+        es_res = self._get_alarm_definitions_response(es_res)
+        if es_res is None:
             return None
-        text = res.text
-        LOG.debug(text)
-        if text:
-            json_text = json.loads(text)
-            if 'elements' in json_text:
-                return json_text['elements']
-        return []
+        LOG.debug('Query to ElasticSearch returned: %s' % es_res)
+        if es_res["hits"]:
+            return es_res["hits"]
+        else:
+            return []
 
     def refresh_alarm_processors(self):
         def create_alarm_processor():
@@ -229,7 +270,8 @@ class AlarmDefinitionConsumer(threading.Thread):
         if alarm_definitions is None:
             return
         if lock.acquire():
-            for alarm_def in alarm_definitions:
+            for alarm_definition in alarm_definitions:
+                alarm_def = alarm_definition['_source']
                 aid = alarm_def['id']
                 if aid in self.threshold_processors:
                     # alarm definition is updated

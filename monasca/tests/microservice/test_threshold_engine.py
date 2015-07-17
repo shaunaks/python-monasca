@@ -1,6 +1,6 @@
 # Copyright 2015 Carnegie Mellon University
 #
-# Author: Han Chen <hanc@andrew.cmu.edu>
+# Author: Yihan Wang<wangff9@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -14,13 +14,13 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import json
+
 import mock
+from monasca.common import es_conn
 from monasca.common import kafka_conn
 from monasca.microservice import threshold_engine as engine
 from oslo.config import fixture as fixture_config
 from oslotest import base
-import requests
 from stevedore import driver
 
 
@@ -29,34 +29,52 @@ class TestThresholdEngine(base.BaseTestCase):
         self.CONF = self.useFixture(fixture_config.Config()).conf
         self.CONF.kafka_opts.uri = 'fake_url'
         self.CONF.thresholdengine.metrics_topic = 'fake_metrics'
-        self.CONF.thresholdengine.definition_topic = (
-            'fake_alarmdefinitions')
         self.CONF.thresholdengine.alarm_topic = 'fake_alarms'
         self.CONF.thresholdengine.check_alarm_interval = 10
-        self.CONF.alarmdefinitions.uri = 'fake_http_url'
+
+        self.CONF.alarmdefinitions.index_strategy = ''
+        self.CONF.alarmdefinitions.doc_type = 'fake_doc_type'
         self.CONF.alarmdefinitions.dimensions = 'fake_key:fake_value'
         self.CONF.alarmdefinitions.name = 'fake_name'
         self.CONF.alarmdefinitions.check_alarm_def_interval = 120
+
+        self.CONF.es_conn.uri = 'fake_es_url'
         super(TestThresholdEngine, self).setUp()
         self.thresh_engine = engine.ThresholdEngine()
 
     def test_initialization(self):
+        params = {'query': {
+            'bool': {'must': [
+                {'query_string': {
+                    'default_field': 'alarmdefinitions.expression_data.'
+                                     'dimensions.fake_key',
+                    'query': 'fake_value'}},
+                {'query_string': {'default_field': 'name',
+                                  'query': 'fake_name'}}]}}}
         # Test Kafka connection uri and topic
         self.assertEqual(self.thresh_engine.thread_metrics.
                          _consume_kafka_conn.uri, 'fake_url')
         self.assertEqual(self.thresh_engine.thread_metrics.
                          _consume_kafka_conn.topic, 'fake_metrics')
-        self.assertEqual(self.thresh_engine.thread_alarm_def.request,
-                         'http://fake_http_url/v2.0/alarm-definitions')
-        self.assertEqual(self.thresh_engine.thread_alarm_def.params,
-                         {'name': 'fake_name',
-                          'dimensions': 'fake_key:fake_value'})
+
+        self.assertEqual(self.thresh_engine.thread_alarm_def.params, params)
         self.assertEqual(self.thresh_engine.thread_alarm_def.interval, 120)
+        self.assertEqual(self.thresh_engine.
+                         thread_alarm_def._es_conn.doc_type, 'fake_doc_type')
+        self.assertEqual(self.thresh_engine.
+                         thread_alarm_def._es_conn.uri, 'fake_es_url/')
+
         self.assertEqual(self.thresh_engine.thread_alarm.
                          _publish_kafka_conn.uri, 'fake_url')
         self.assertEqual(self.thresh_engine.thread_alarm.
                          _publish_kafka_conn.topic, 'fake_alarms')
         self.assertEqual(self.thresh_engine.thread_alarm.interval, 10)
+
+    def get_response_str(self, fake_alarm_def):
+        ad_list = []
+        for ad in fake_alarm_def:
+            ad_list.append({'_source': ad})
+        return {"hits": {"hits": ad_list}}
 
     def test_refresh_alarm_definitions(self):
         # test refresh alarm definitions
@@ -65,13 +83,14 @@ class TestThresholdEngine(base.BaseTestCase):
               {'id': 'fake_id_2', 'expression': 'fake_expr_2'}]
         res = mock.Mock()
         res.status_code = 200
-        res.text = json.dumps({'elements': ad})
+        response_json = self.get_response_str(ad)
+        res.json.return_value = response_json
         processor = mock.Mock()
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(requests, 'get',
+                with mock.patch.object(es_conn.ESConnection, 'get_messages',
                                        return_value=res):
                     (self.thresh_engine.thread_alarm_def.
                      refresh_alarm_processors())
@@ -87,13 +106,14 @@ class TestThresholdEngine(base.BaseTestCase):
               {'id': 'fake_id_2', 'expression': 'fake_expr_2'}]
         res = mock.Mock()
         res.status_code = 200
-        res.text = json.dumps({'elements': ad})
+        response_json = self.get_response_str(ad)
+        res.json.return_value = response_json
         processor = mock.Mock()
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(requests, 'get',
+                with mock.patch.object(es_conn.ESConnection, 'get_messages',
                                        return_value=res):
                     (self.thresh_engine.thread_alarm_def.
                      refresh_alarm_processors())
@@ -110,13 +130,14 @@ class TestThresholdEngine(base.BaseTestCase):
         ad = []
         res = mock.Mock()
         res.status_code = 201
-        res.text = json.dumps({'elements': ad})
+        response_json = self.get_response_str(ad)
+        res.json.return_value = response_json
         processor = mock.Mock()
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(requests, 'get',
+                with mock.patch.object(es_conn.ESConnection, 'get_messages',
                                        return_value=res):
                     (self.thresh_engine.thread_alarm_def.
                      refresh_alarm_processors())
@@ -151,12 +172,13 @@ class TestThresholdEngine(base.BaseTestCase):
         processor = mock.Mock()
         res = mock.Mock()
         res.status_code = 200
-        res.text = json.dumps({'elements': [{'id': 'fake_id_1'}]})
+        response_json = self.get_response_str([{'id': 'fake_id_1'}])
+        res.json.return_value = response_json
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(requests, 'get',
+                with mock.patch.object(es_conn.ESConnection, 'get_messages',
                                        return_value=res):
                     (self.thresh_engine.thread_alarm_def.
                      refresh_alarm_processors())
@@ -174,12 +196,13 @@ class TestThresholdEngine(base.BaseTestCase):
         processor = mock.Mock()
         res = mock.Mock()
         res.status_code = 200
-        res.text = json.dumps({'elements': [{'id': 'fake_id_1'}]})
+        response_json = self.get_response_str([{'id': 'fake_id_1'}])
+        res.json.return_value = response_json
         with mock.patch.object(driver.DriverManager, '__init__',
                                return_value=None):
             with mock.patch.object(driver.DriverManager, 'driver',
                                    return_value=processor):
-                with mock.patch.object(requests, 'get',
+                with mock.patch.object(es_conn.ESConnection, 'get_messages',
                                        return_value=res):
                     (self.thresh_engine.thread_alarm_def.
                      refresh_alarm_processors())
