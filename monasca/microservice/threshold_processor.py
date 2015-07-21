@@ -251,9 +251,16 @@ class ThresholdProcessor(object):
                 data_list['metrics'].append(
                     {'value': float(data['value']),
                      'timestamp': float(data['timestamp'])})
+                return True
+            else:
+                return False
 
-        if _has_match_expr():
-            _add_metrics()
+        if _has_match_expr() and _add_metrics():
+            LOG.debug("Alarm def: %s consumes the metrics!"
+                      % self.alarm_definition['name'])
+        else:
+            LOG.debug("Alarm def: %s don't need the metrics!"
+                      % self.alarm_definition['name'])
 
     def create_data_item(self, name):
         """If new match_up tuple, create new entry to store metrics value."""
