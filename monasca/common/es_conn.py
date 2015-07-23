@@ -75,6 +75,7 @@ class ESConnection(object):
             path = '%s%s%s/%s/_bulk' % (self.uri, self.index_prefix,
                                         index, self.doc_type)
             res = requests.post(path, data=msg)
+            LOG.debug('Msg post target=%s' % path)
             LOG.debug('Msg posted with response code: %s' % res.status_code)
             return res.status_code
 
