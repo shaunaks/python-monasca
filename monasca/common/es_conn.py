@@ -72,8 +72,8 @@ class ESConnection(object):
             # index may change over the time, it has to be called for each
             # request
             index = self.index_strategy.get_index()
-            path = '%s%s%s/%s/_bulk' % (self.uri, self.index_prefix,
-                                        index, self.doc_type)
+            path = '%s%s%s/%s/' % (self.uri, self.index_prefix,
+                                   index, self.doc_type)
             res = requests.post(path, data=msg)
             LOG.debug('Msg post target=%s' % path)
             LOG.debug('Msg posted with response code: %s' % res.status_code)
