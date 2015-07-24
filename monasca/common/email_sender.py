@@ -85,6 +85,5 @@ class EmailSender(object):
             return True
         except Exception as e:
             LOG.debug('Mail sent Exception: %s, reset the sender.' % str(e))
-            self.smtp.quit()
             self.reset()
             return False
