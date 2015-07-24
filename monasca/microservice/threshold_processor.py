@@ -168,7 +168,7 @@ class ThresholdProcessor(object):
         def _update_metrics():
             """Delete metrics not in period."""
             data_list = expr_data['data'][expr.fmtd_sub_expr_str]['metrics']
-            start_time = t_now - (float(expr.period) + 2) * int(expr.periods)
+            start_time = t_now - (float(expr.period)) * int(expr.periods)
             while (len(data_list) != 0
                    and data_list[0]['timestamp'] < start_time):
                 data_list.popleft()
@@ -179,6 +179,11 @@ class ThresholdProcessor(object):
             data_list = data_sub['metrics']
             if len(data_list) == 0:
                 data_sub['state'] = 'UNDETERMINED'
+                value_in_periods = []
+                for i in range(int(expr.periods)):
+                    value_in_periods.append(None)
+                expr_data['data'][expr.fmtd_sub_expr_str]['values'] = (
+                    value_in_periods)
             else:
                 period = float(expr.period)
                 periods = int(expr.periods)
