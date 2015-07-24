@@ -14,7 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import ast
+import json
 from monasca.common import email_sender
 from monasca.openstack.common import log
 
@@ -86,15 +86,15 @@ class NotificationProcessor(object):
                 # the method id can be used to match the
                 # notification method in elasticSearch
                 # Then an email will be sent
-                dict_msg = ast.literal_eval(value)
-                state = dict_msg["state"]
+                json_msg = json.loads(value)
+                state = json_msg["state"]
                 if state not in ["ALARM", "OK", "UNDETERMINED"]:
                     LOG.error("state of alarm is not defined as expected")
                     return
 
                 actions = []
                 if state in ACTIONS.keys():
-                    actions = dict_msg["alarm_definition"][ACTIONS[state]]
+                    actions = json_msg["alarm_definition"][ACTIONS[state]]
 
                 addresses = []
                 types = []
@@ -126,5 +126,5 @@ class NotificationProcessor(object):
                 self._email_sender.send_emails(
                     self.email_addresses,
                     "Alarm from Monasca:" + name + "-" +
-                    dict_msg["alarm_definition"]["description"],
-                    str(dict_msg))
+                    json_msg["alarm_definition"]["description"],
+                    str(json_msg))
