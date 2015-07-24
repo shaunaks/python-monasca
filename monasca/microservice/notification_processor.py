@@ -20,6 +20,10 @@ from monasca.openstack.common import log
 
 LOG = log.getLogger(__name__)
 
+ACTIONS = {'ALARM': 'alarm_actions',
+           'OK': 'ok_actions',
+           'UNDETERMINED': 'undetermined_actions'}
+
 
 class NotificationProcessor(object):
     def __init__(self):
@@ -89,13 +93,8 @@ class NotificationProcessor(object):
                     return
 
                 actions = []
-                if state == 'ALARM':
-                    actions = dict_msg["alarm_definition"]["alarm_actions"]
-                if state == 'OK':
-                    actions = dict_msg["alarm_definition"]["ok_actions"]
-                if state == 'UNDETERMINED':
-                    actions = dict_msg[
-                        "alarm_definition"]["undetermined_actions"]
+                if state in ACTIONS.keys():
+                    actions = dict_msg["alarm_definition"][ACTIONS[state]]
 
                 addresses = []
                 types = []

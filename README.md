@@ -89,13 +89,12 @@ a specific configuration file to be launched. Here are the examples:
 
     monasca-service --config-file /etc/monasca/monasca-anomaly.conf
 
-To start the monasca ui server, run the following command
+If you are developing monasca, and would like to run all the services in one
+screen and use default configurations, then you can simply run the following
+command from monasca root direction:
 
-    gunicorn -k eventlet --worker-connections=100 --backlogs=100
-             --paste /etc/monasca/dashboard.conf
+    screen -c kiloeyes
 
-    the ElasticSearch Kibana has been changed. This section needs some
-    rework.
 
 Monasca Integration with OpenStack Horizon
 ==========================================
