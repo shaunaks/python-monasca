@@ -155,7 +155,7 @@ class AlarmDispatcher(object):
                             "links": [{"rel": "self",
                                        "href": req.uri}],
                             "alarm_definition": current_alarm["_source"]
-                            ["alarm-definition"],
+                            ["alarm_definition"],
                             "metrics": current_alarm["_source"]["metrics"],
                             "state": current_alarm["_source"]["state"],
                             "sub_alarms": current_alarm["_source"]

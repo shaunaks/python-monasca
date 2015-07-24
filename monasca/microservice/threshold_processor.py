@@ -168,7 +168,7 @@ class ThresholdProcessor(object):
         def _update_metrics():
             """Delete metrics not in period."""
             data_list = expr_data['data'][expr.fmtd_sub_expr_str]['metrics']
-            start_time = t_now - (float(expr.period) + 2) * int(expr.periods)
+            start_time = t_now - (float(expr.period)) * int(expr.periods)
             while (len(data_list) != 0
                    and data_list[0]['timestamp'] < start_time):
                 data_list.popleft()
@@ -179,6 +179,11 @@ class ThresholdProcessor(object):
             data_list = data_sub['metrics']
             if len(data_list) == 0:
                 data_sub['state'] = 'UNDETERMINED'
+                value_in_periods = []
+                for i in range(int(expr.periods)):
+                    value_in_periods.append(None)
+                expr_data['data'][expr.fmtd_sub_expr_str]['values'] = (
+                    value_in_periods)
             else:
                 period = float(expr.period)
                 periods = int(expr.periods)
@@ -250,7 +255,7 @@ class ThresholdProcessor(object):
                 data_list = temp['data'][expr.fmtd_sub_expr_str]
                 data_list['metrics'].append(
                     {'value': float(data['value']),
-                     'timestamp': float(data['timestamp'])})
+                     'timestamp': tu.utcnow_ts()})
                 return True
             else:
                 return False
@@ -302,7 +307,7 @@ class ThresholdProcessor(object):
         alarm = {}
         id = str(uuid.uuid4())
         alarm['id'] = id
-        alarm['alarm_definition_id'] = self.alarm_definition['id']
+        alarm['alarm_definition'] = self.alarm_definition
         alarm['metrics'] = self.related_metrics[name]
         alarm['state'] = self.expr_data_queue[name]['state']
         alarm['reason'] = reasons[alarm['state']]

@@ -15,6 +15,7 @@
 # under the License.
 
 import json
+import mock
 from monasca.microservice import threshold_processor as processor
 from monasca.openstack.common import log
 from monasca.openstack.common import timeutils as tu
@@ -94,7 +95,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         # send metrics to the processor
         metrics_list = self.util.get_metrics("metrics_utf8")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         # manually call the function to update alarms
         alarms = tp.process_alarms()
         print (alarms)
@@ -106,7 +110,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_periods_0")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(1, len(alarms))
@@ -115,7 +122,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_periods_1")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(1, len(alarms))
@@ -125,7 +135,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_periods_2")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(0, len(alarms))
@@ -135,7 +148,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_match_by")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(3, len(alarms))
@@ -148,7 +164,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_multi_match_by")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(3, len(alarms))
@@ -158,7 +177,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_more_dimensions")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(1, len(alarms))
@@ -171,7 +193,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_match_by_wrong")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         self.assertEqual(1, len(alarms))
@@ -196,7 +221,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_match_by")
         for metrics in metrics_list:
-            tp.process_metrics(metrics)
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
         alarms = tp.process_alarms()
         print (alarms)
         ad = self.util.get_alarm_def("alarm_def_match_by_update")

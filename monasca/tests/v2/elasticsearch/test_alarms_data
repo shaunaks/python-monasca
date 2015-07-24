@@ -7,7 +7,7 @@
                 "_id":"cb71cc0f-ade1-433e-aa2d-22b12067cba0",
                 "_source":{
                     "id":"cb71cc0f-ade1-433e-aa2d-22b12067cba0",
-                    "alarm-definition":{
+                    "alarm_definition":{
                         "alarm_actions":[
                             "c60ec47e-5038-4bf1-9f95-4046c6e9a719"
                         ],
@@ -58,7 +58,7 @@
                 "_id":"1cfd25cb-f60d-4f5b-845f-8048c0678a8f",
                 "_source":{
                     "id":"1cfd25cb-f60d-4f5b-845f-8048c0678a8f",
-                    "alarm-definition":{
+                    "alarm_definition":{
                         "alarm_actions":[
                             "c60ec47e-5038-4bf1-9f95-4046c6e9a719"
                         ],

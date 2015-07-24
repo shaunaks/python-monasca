@@ -55,7 +55,7 @@ class NotificationProcessor(object):
                 #   },
                 #   "state_updated_timestamp": 1432672915,
                 #   "state": "ALARM",
-                #   "alarm-definition": {
+                #   "alarm_definition": {
                 #     "alarm_actions": [
                 #       "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
                 #     ],
@@ -90,12 +90,12 @@ class NotificationProcessor(object):
 
                 actions = []
                 if state == 'ALARM':
-                    actions = dict_msg["alarm-definition"]["alarm_actions"]
+                    actions = dict_msg["alarm_definition"]["alarm_actions"]
                 if state == 'OK':
-                    actions = dict_msg["alarm-definition"]["ok_actions"]
+                    actions = dict_msg["alarm_definition"]["ok_actions"]
                 if state == 'UNDETERMINED':
                     actions = dict_msg[
-                        "alarm-definition"]["undetermined_actions"]
+                        "alarm_definition"]["undetermined_actions"]
 
                 addresses = []
                 types = []
@@ -127,5 +127,5 @@ class NotificationProcessor(object):
                 self._email_sender.send_emails(
                     self.email_addresses,
                     "Alarm from Monasca:" + name + "-" +
-                    dict_msg["alarm-definition"]["description"],
+                    dict_msg["alarm_definition"]["description"],
                     str(dict_msg))
