@@ -80,7 +80,7 @@ class TestNotificationProcessor(tests.BaseTestCase):
              "'dimensions': {'key2': 'value2', 'key1': 'value1'}},"
              "'state_updated_timestamp': 1432672915,"
              "'state': 'ALARM',"
-             "'alarm-definition':"
+             "'alarm_definition':"
              "{'alarm_actions': ['c60ec47e-5038-4bf1-9f95-4046c6e9a759'],"
              "'undetermined_actions': "
              "['c60ec47e-5038-4bf1-9f95-4046c6e9a759'],"

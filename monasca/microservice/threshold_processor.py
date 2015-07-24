@@ -250,7 +250,7 @@ class ThresholdProcessor(object):
                 data_list = temp['data'][expr.fmtd_sub_expr_str]
                 data_list['metrics'].append(
                     {'value': float(data['value']),
-                     'timestamp': float(data['timestamp'])})
+                     'timestamp': tu.utcnow_ts()})
                 return True
             else:
                 return False
@@ -302,7 +302,7 @@ class ThresholdProcessor(object):
         alarm = {}
         id = str(uuid.uuid4())
         alarm['id'] = id
-        alarm['alarm_definition_id'] = self.alarm_definition['id']
+        alarm['alarm_definition'] = self.alarm_definition
         alarm['metrics'] = self.related_metrics[name]
         alarm['state'] = self.expr_data_queue[name]['state']
         alarm['reason'] = reasons[alarm['state']]
