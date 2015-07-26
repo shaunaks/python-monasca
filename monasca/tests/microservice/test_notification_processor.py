@@ -100,7 +100,7 @@ class TestNotificationProcessor(tests.BaseTestCase):
                                    "_get_notification_method_response",
                                    return_value=json.loads(response_str).
                                    get("hits")):
-                with mock.patch.object(ast, 'literal_eval',
+                with mock.patch.object(json, 'loads',
                                        return_value=ast.literal_eval(r)):
                     np = notification_processor.NotificationProcessor()
                     np.handle_alarm_msg(_es_conn, msg)
