@@ -33,7 +33,8 @@ STATE_UNDETERMINED = 'UNDETERMINED'
 def calc_value(func, data_list):
     """Calc float values according to 5 functions."""
 
-    if len(data_list) == 0 or func not in agg_ops:
+    if (func not in agg_ops or
+            (len(data_list) == 0 and func != 'COUNT')):
         return None
     else:
         return agg_ops[func](data_list)
@@ -53,15 +54,14 @@ def compare_thresh(values, op, thresh):
     so it's 'UNDETERMINED';
     otherwise, the state can be 'ALARM'
     """
-
     for value in values:
-        if value and comp_ops[op](value, thresh):
+        if value is not None and comp_ops[op](value, thresh):
             return STATE_OK
 
     state = STATE_ALARM
     for value in values:
         if value is None:
-            state = 'UNDETERMINED'
+            state = STATE_UNDETERMINED
     return state
 
 

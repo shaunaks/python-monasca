@@ -172,6 +172,33 @@ class TestThresholdProcessor(tests.BaseTestCase):
         print (alarms)
         self.assertEqual(3, len(alarms))
 
+        # test alarms with func count
+        ad = self.util.get_alarm_def("alarm_def_count")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_count_ok")
+        for metrics in metrics_list:
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
+        alarms = tp.process_alarms()
+        self.assertEqual(1, len(alarms))
+        print (alarms)
+        self.assertEqual('OK', json.loads(alarms[0])['state'])
+        print (json.loads(alarms[0])['sub_alarms'][0]['current_values'])
+        metrics_list = self.util.get_metrics("metrics_count_alarm")
+        for metrics in metrics_list:
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
+        alarms = tp.process_alarms()
+        print (alarms)
+        self.assertEqual(1, len(alarms))
+        self.assertEqual(1, len(json.loads(alarms[0])['metrics']))
+        print (json.loads(alarms[0])['sub_alarms'][0]['current_values'])
+        self.assertEqual('ALARM', json.loads(alarms[0])['state'])
+
         # test alarms with metrics having more dimensions
         ad = self.util.get_alarm_def("alarm_def_more_dimensions")
         tp = processor.ThresholdProcessor(ad)
