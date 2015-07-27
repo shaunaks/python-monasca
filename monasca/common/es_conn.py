@@ -25,9 +25,9 @@ ES_OPTS = [
     cfg.StrOpt('uri',
                help='Address to kafka server. For example: '
                'uri=http://192.168.1.191:9200/'),
-    cfg.StrOpt('time_id',
-               default='timestamp',
-               help='The type of the data.'),
+    cfg.StrOpt('id_field',
+               default='',
+               help='The field name for _id.'),
     cfg.BoolOpt('drop_data',
                 default=False,
                 help=('Specify if received data should be simply dropped. '
@@ -56,7 +56,7 @@ class ESConnection(object):
         self.index_strategy = index_stratey
         self.index_prefix = index_prefix
 
-        self.time_id = cfg.CONF.es_conn.time_id
+        self.id_field = cfg.CONF.es_conn.id_field
         self.drop_data = cfg.CONF.es_conn.drop_data
 
         self.search_path = '%s%s*/%s/_search' % (self.uri,
@@ -69,11 +69,20 @@ class ESConnection(object):
         if self.drop_data:
             return
         else:
+            # figure out id situation
+            _id = ''
+            if self.id_field:
+                obj = json.loads(msg)
+                _id = obj.get(self.id_field)
+                if not _id:
+                    LOG.error('Msg does not have required id field %s' %
+                              self.id_field)
+                    return 400
             # index may change over the time, it has to be called for each
             # request
             index = self.index_strategy.get_index()
-            path = '%s%s%s/%s/' % (self.uri, self.index_prefix,
-                                   index, self.doc_type)
+            path = '%s%s%s/%s/%s' % (self.uri, self.index_prefix,
+                                     index, self.doc_type, _id)
             res = requests.post(path, data=msg)
             LOG.debug('Msg post target=%s' % path)
             LOG.debug('Msg posted with response code: %s' % res.status_code)
