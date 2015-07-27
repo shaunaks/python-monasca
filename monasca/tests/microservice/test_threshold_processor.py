@@ -101,7 +101,6 @@ class TestThresholdProcessor(tests.BaseTestCase):
                 tp.process_metrics(metrics)
         # manually call the function to update alarms
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(1, len(alarms))
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
 
@@ -115,7 +114,6 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(1, len(alarms))
         self.assertEqual('OK', json.loads(alarms[0])['state'])
         ad = self.util.get_alarm_def("alarm_def_periods")
@@ -127,10 +125,8 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(1, len(alarms))
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
-        print (json.loads(alarms[0])['sub_alarms'][0]['current_values'])
         ad = self.util.get_alarm_def("alarm_def_periods")
         tp = processor.ThresholdProcessor(ad)
         metrics_list = self.util.get_metrics("metrics_periods_2")
@@ -140,7 +136,6 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(0, len(alarms))
 
         # test alarms with match_up
@@ -153,7 +148,6 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(3, len(alarms))
         self.assertEqual('ALARM', tp.expr_data_queue['h1,']['state'])
         self.assertEqual('ALARM', tp.expr_data_queue['h2,']['state'])
@@ -169,8 +163,30 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(3, len(alarms))
+
+        # test alarms with func count
+        ad = self.util.get_alarm_def("alarm_def_count")
+        tp = processor.ThresholdProcessor(ad)
+        metrics_list = self.util.get_metrics("metrics_count_ok")
+        for metrics in metrics_list:
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
+        alarms = tp.process_alarms()
+        self.assertEqual(1, len(alarms))
+        self.assertEqual('OK', json.loads(alarms[0])['state'])
+        metrics_list = self.util.get_metrics("metrics_count_alarm")
+        for metrics in metrics_list:
+            timestamp = json.loads(metrics)['timestamp']
+            with mock.patch.object(tu, 'utcnow_ts',
+                                   return_value=timestamp):
+                tp.process_metrics(metrics)
+        alarms = tp.process_alarms()
+        self.assertEqual(1, len(alarms))
+        self.assertEqual(1, len(json.loads(alarms[0])['metrics']))
+        self.assertEqual('ALARM', json.loads(alarms[0])['state'])
 
         # test alarms with metrics having more dimensions
         ad = self.util.get_alarm_def("alarm_def_more_dimensions")
@@ -182,10 +198,8 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(1, len(alarms))
         self.assertEqual(1, len(json.loads(alarms[0])['metrics']))
-        print (json.loads(alarms[0])['sub_alarms'][0]['current_values'])
         self.assertEqual('ALARM', json.loads(alarms[0])['state'])
 
         # test when receiving wrong format metrics
@@ -198,7 +212,6 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(1, len(alarms))
         self.assertEqual([1300],
                          json.loads(alarms[0])
@@ -208,12 +221,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
         ad = self.util.get_alarm_def("alarm_def_match_by")
         tp = processor.ThresholdProcessor(ad)
         alarms = tp.process_alarms()
-        print (alarms)
         metrics_list = self.util.get_metrics("metrics_not_match")
         for metrics in metrics_list:
             tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual('OK', json.loads(alarms[0])['state'])
 
         # test a success update alarm definition
@@ -226,12 +237,10 @@ class TestThresholdProcessor(tests.BaseTestCase):
                                    return_value=timestamp):
                 tp.process_metrics(metrics)
         alarms = tp.process_alarms()
-        print (alarms)
         ad = self.util.get_alarm_def("alarm_def_match_by_update")
         re = tp.update_thresh_processor(ad)
         self.assertEqual(True, re)
         alarms = tp.process_alarms()
-        print (alarms)
         self.assertEqual(3, len(alarms))
         ad = self.util.get_alarm_def("alarm_def_periods")
         tp = processor.ThresholdProcessor(ad)

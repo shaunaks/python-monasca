@@ -177,42 +177,38 @@ class ThresholdProcessor(object):
             """Update state of a sub expr."""
             data_sub = expr_data['data'][expr.fmtd_sub_expr_str]
             data_list = data_sub['metrics']
-            if len(data_list) == 0:
-                data_sub['state'] = 'UNDETERMINED'
-                value_in_periods = []
-                for i in range(int(expr.periods)):
-                    value_in_periods.append(None)
-                expr_data['data'][expr.fmtd_sub_expr_str]['values'] = (
-                    value_in_periods)
-            else:
-                period = float(expr.period)
-                periods = int(expr.periods)
-                right = t_now
-                left = right - period
-                temp_data = []
-                value_in_periods = []
-                for i in range(len(data_list) - 1, -1, -1):
-                    if data_list[i]['timestamp'] >= left:
-                        temp_data.append(float(data_list[i]['value']))
-                    else:
-                        value = calculator.calc_value(
-                            expr.normalized_func, temp_data)
-                        value_in_periods.append(value)
-                        right = left
-                        left = right - period
-                        temp_data = []
-                value = calculator.calc_value(
-                    expr.normalized_func, temp_data)
-                value_in_periods.append(value)
-                for i in range(len(value_in_periods), periods, 1):
-                    value_in_periods.append(None)
-                expr_data['data'][expr.fmtd_sub_expr_str]['values'] = (
-                    value_in_periods)
-                expr_data['data'][expr.fmtd_sub_expr_str]['state'] = (
-                    calculator.compare_thresh(
-                        value_in_periods,
-                        expr.normalized_operator,
-                        float(expr.threshold)))
+            period = float(expr.period)
+            periods = int(expr.periods)
+            right = t_now
+            left = right - period
+            temp_data = []
+            value_in_periods = []
+            i = len(data_list) - 1
+            while i >= 0:
+                if data_list[i]['timestamp'] >= left:
+                    temp_data.append(float(data_list[i]['value']))
+                else:
+                    value = calculator.calc_value(
+                        expr.normalized_func, temp_data)
+                    value_in_periods.append(value)
+                    right = left
+                    left = right - period
+                    temp_data = []
+                    i += 1
+                i -= 1
+            value = calculator.calc_value(
+                expr.normalized_func, temp_data)
+            value_in_periods.append(value)
+            for i in range(len(value_in_periods), periods, 1):
+                value_in_periods.append(
+                    calculator.calc_value(expr.normalized_func, []))
+            expr_data['data'][expr.fmtd_sub_expr_str]['values'] = (
+                value_in_periods)
+            expr_data['data'][expr.fmtd_sub_expr_str]['state'] = (
+                calculator.compare_thresh(
+                    value_in_periods,
+                    expr.normalized_operator,
+                    float(expr.threshold)))
 
         t_now = tu.utcnow_ts()
         _update_metrics()

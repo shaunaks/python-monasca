@@ -55,6 +55,25 @@
         "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
       ]
     },
+    "alarm_def_count": {
+      "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
+      "name": "alarm definition for test",
+      "description": "the definition used for testing thresh processor",
+      "expression": "count(biz{key2=value2})>3",
+      "match_by": [
+        "hostname"
+      ],
+      "severity": "LOW",
+      "ok_actions": [
+        "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
+      ],
+      "alarm_actions": [
+        "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
+      ],
+      "undetermined_actions": [
+        "c60ec47e-5038-4bf1-9f95-4046c6e9a759"
+      ]
+    },
     "alarm_def_more_dimensions": {
       "id": "f9935bcc-9641-4cbf-8224-0993a947ea83",
       "name": "alarm definition for test",
@@ -550,6 +569,64 @@
         "dimensions": {
           "key2": "value2",
           "hostname": "h3"
+        }
+      }
+    ],
+    "metrics_count_alarm": [
+      {
+        "time_offset": -35,
+        "name": "biz",
+        "value": 1300,
+        "dimensions": {
+          "key2": "value2",
+          "hostname": "h1"
+        }
+      },
+      {
+        "time_offset": -30,
+        "name": "biz",
+        "value": 1200,
+        "dimensions": {
+          "key2": "value2",
+          "hostname": "h1"
+        }
+      },
+      {
+        "time_offset": -20,
+        "name": "biz",
+        "value": 1200,
+        "dimensions": {
+          "key2": "value2",
+          "hostname": "h1"
+        }
+      },
+      {
+        "time_offset": -10,
+        "name": "biz",
+        "value": 1200,
+        "dimensions": {
+          "key2": "value2",
+          "hostname": "h1"
+        }
+      },
+      {
+        "time_offset": 0,
+        "name": "biz",
+        "value": 1601,
+        "dimensions": {
+          "key2": "value2",
+          "hostname": "h1"
+        }
+      }
+    ],
+    "metrics_count_ok": [
+      {
+        "time_offset": -40,
+        "name": "biz",
+        "value": 1300,
+        "dimensions": {
+          "key2": "value2",
+          "hostname": "h1"
         }
       }
     ],
