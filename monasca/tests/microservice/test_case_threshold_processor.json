@@ -574,7 +574,7 @@
     ],
     "metrics_count_alarm": [
       {
-        "time_offset": -400,
+        "time_offset": -35,
         "name": "biz",
         "value": 1300,
         "dimensions": {
@@ -621,7 +621,7 @@
     ],
     "metrics_count_ok": [
       {
-        "time_offset": -400,
+        "time_offset": -40,
         "name": "biz",
         "value": 1300,
         "dimensions": {

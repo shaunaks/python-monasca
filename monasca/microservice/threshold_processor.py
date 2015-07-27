@@ -183,7 +183,8 @@ class ThresholdProcessor(object):
             left = right - period
             temp_data = []
             value_in_periods = []
-            for i in range(len(data_list) - 1, -1, -1):
+            i = len(data_list) - 1
+            while i >= 0:
                 if data_list[i]['timestamp'] >= left:
                     temp_data.append(float(data_list[i]['value']))
                 else:
@@ -193,6 +194,8 @@ class ThresholdProcessor(object):
                     right = left
                     left = right - period
                     temp_data = []
+                    i += 1
+                i -= 1
             value = calculator.calc_value(
                 expr.normalized_func, temp_data)
             value_in_periods.append(value)
