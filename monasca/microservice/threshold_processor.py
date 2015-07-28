@@ -116,6 +116,8 @@ class ThresholdProcessor(object):
         self.alarm_definition = new_alarm_definition
         self.expression = new_expression
         self.match_by = self.alarm_definition['match_by']
+        if '' in self.match_by:
+            self.match_by.remove('')
         if len(self.match_by) == 0:
             self.match_by = None
         LOG.debug('successfully update ThresholdProcessor!')
