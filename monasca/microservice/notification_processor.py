@@ -101,30 +101,34 @@ class NotificationProcessor(object):
                 # the action_id is an id of notification method
                 # there can be multiple ids in one alarm message with different
                 # types
-                for action_id in actions:
+                try:
+                    for action_id in actions:
 
-                    es_res = _es_conn.get_message_by_id(action_id)
-                    es_res = self._get_notification_method_response(es_res)
+                        es_res = _es_conn.get_message_by_id(action_id)
+                        es_res = self._get_notification_method_response(es_res)
 
-                    LOG.debug('Query to ElasticSearch returned: %s' % es_res)
+                        LOG.debug('Query to ElasticSearch returned: %s'
+                                  % es_res)
 
-                    if es_res is None:
-                        LOG.error("The provided is not defined as expected")
-                        return
+                        if es_res is None or es_res["hits"] is None:
+                            LOG.error("The action is not defined as expected")
+                            return
 
-                    name = es_res["hits"][0]["_source"]["name"]
-                    type = es_res["hits"][0]["_source"]["type"]
-                    address = es_res["hits"][0]["_source"]["address"]
+                        name = es_res["hits"][0]["_source"]["name"]
+                        type = es_res["hits"][0]["_source"]["type"]
+                        address = es_res["hits"][0]["_source"]["address"]
 
-                    types.append(type)
-                    addresses.append(address)
+                        types.append(type)
+                        addresses.append(address)
 
-                for i in range(len(types)):
-                    if types[i] == "EMAIL":
-                        self.email_addresses.append(addresses[i])
+                    for i in range(len(types)):
+                        if types[i] == "EMAIL":
+                            self.email_addresses.append(addresses[i])
 
-                self._email_sender.send_emails(
-                    self.email_addresses,
-                    "Alarm from Monasca:" + name + "-" +
-                    json_msg["alarm_definition"]["description"],
-                    str(json_msg))
+                    self._email_sender.send_emails(
+                        self.email_addresses,
+                        "Alarm from Monasca:" + name + "-" +
+                        json_msg["alarm_definition"]["description"],
+                        str(json_msg))
+                except Exception:
+                    LOG.exception('Exception performing alarm action')
