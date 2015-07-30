@@ -71,11 +71,11 @@ class AlarmDispatcher(object):
         self._es_conn = es_conn.ESConnection(
             self.doc_type, self.index_strategy, self.index_prefix)
 
-    def _get_alarms_response(self, res):
+    def _get_alarms_response(self, res, ele_name='hits'):
         if res and res.status_code == 200:
             obj = res.json()
             if obj:
-                return obj.get('hits')
+                return obj.get(ele_name)
             return None
         else:
             return None
@@ -131,42 +131,48 @@ class AlarmDispatcher(object):
         LOG.debug('Request Query String: %s' % query_string)
 
         # Transform the query string with proper search format
-        params = self._get_alarms_helper(query_string)
-        LOG.debug('Query Data: %s' % params)
+        # params = self._get_alarms_helper(query_string)
+        # LOG.debug('Query Data: %s' % params)
+        params = ('{"aggs": {"latest_state": {'
+                  '"terms": {"field": "alarm_definition.name", "size": 0},'
+                  '"aggs": {"top_state_hits": {"top_hits": {"sort": ['
+                  '{"updated_timestamp": {"order": "desc"}}],'
+                  '"_source": {"include": ['
+                  '"state", "created_timestamp","updated_timestamp",'
+                  '"metrics","sub_alarms","state_updated_timestamp",'
+                  '"id", "alarm_definition"]},"size" : 1}}}}}}')
 
-        es_res = self._es_conn.get_messages(params)
+        es_res = self._es_conn.get_messages(json.loads(params),
+                                            q_string='search_type=count')
         res.status = getattr(falcon, 'HTTP_%s' % es_res.status_code)
         LOG.debug('Query to ElasticSearch returned Status: %s' %
                   es_res.status_code)
 
-        es_res = self._get_alarms_response(es_res)
+        es_res = self._get_alarms_response(es_res, ele_name='aggregations')
         LOG.debug('Query to ElasticSearch returned: %s' % es_res)
 
         res.body = ''
         result_elements = []
         try:
-            if es_res["hits"]:
-                res_data = es_res["hits"]
+            if es_res["latest_state"]:
+                res_data = es_res["latest_state"]["buckets"]
                 res.body = '['
-                for current_alarm in res_data:
-                    if current_alarm:
+                for bucket in res_data:
+                    alarm = bucket['top_state_hits']['hits']['hits'][0]
+                    if alarm and alarm['_source']:
+                        alarm = alarm['_source']
                         result_elements.append({
-                            "id": current_alarm["_source"]["id"],
+                            "id": alarm["id"],
                             "links": [{"rel": "self",
                                        "href": req.uri}],
-                            "alarm_definition": current_alarm["_source"]
-                            ["alarm_definition"],
-                            "metrics": current_alarm["_source"]["metrics"],
-                            "state": current_alarm["_source"]["state"],
-                            "sub_alarms": current_alarm["_source"]
-                            ["sub_alarms"],
+                            "alarm_definition": alarm["alarm_definition"],
+                            "metrics": alarm["metrics"],
+                            "state": alarm["state"],
+                            "sub_alarms": alarm["sub_alarms"],
                             "state_updated_timestamp":
-                                current_alarm["_source"]
-                                ["state_updated_timestamp"],
-                            "updated_timestamp": current_alarm["_source"]
-                            ["updated_timestamp"],
-                            "created_timestamp": current_alarm["_source"]
-                            ["created_timestamp"]})
+                                alarm["state_updated_timestamp"],
+                            "updated_timestamp": alarm["updated_timestamp"],
+                            "created_timestamp": alarm["created_timestamp"]})
                 res.body = json.dumps({
                     "links": [{"rel": "self", "href": req.uri}],
                     "elements": result_elements

@@ -54,6 +54,10 @@ class TestAlarmDispatcher(base.BaseTestCase):
                                              'test_alarms_data')
                                 ).read().replace('\n', '')
         self.data = json.loads(alarms_data_json)
+        get_alarms_data = open(os.path.join(dir_path,
+                                            'test_get_alarms_data')
+                               ).read().replace('\n', '')
+        self.get_alarms_data = json.loads(get_alarms_data)
 
     def test_initialization(self):
         # test that the doc type of the es connection is fake
@@ -65,7 +69,7 @@ class TestAlarmDispatcher(base.BaseTestCase):
         res = mock.Mock()
         req = mock.Mock()
         req_result = mock.Mock()
-        response_str = self.data
+        response_str = self.get_alarms_data
         req_result.json.return_value = response_str
         req_result.status_code = 200
 
@@ -81,27 +85,19 @@ class TestAlarmDispatcher(base.BaseTestCase):
 
         # test that the first response object has the required properties
         self.assertEqual(obj[0]['id'],
-                         'cb71cc0f-ade1-433e-aa2d-22b12067cba0')
+                         '1bcbe772-f12b-44ef-a1b5-7685baeaaba2')
         self.assertNotEqual(obj[0]['alarm_definition'], None)
         self.assertNotEqual(obj[0]['metrics'], None)
         self.assertEqual(obj[0]['state'], 'OK')
         self.assertNotEqual(obj[0]['sub_alarms'], None)
-        self.assertEqual(obj[0]['created_timestamp'], '2015-06-17T18:43:21Z')
-        self.assertEqual(obj[0]['updated_timestamp'], '2015-06-17T18:43:27Z')
-        self.assertEqual(obj[0]['state_updated_timestamp'],
-                         '2015-06-17T18:43:27Z')
 
         # test that the second response object has the required properties
         self.assertEqual(obj[1]['id'],
-                         '1cfd25cb-f60d-4f5b-845f-8048c0678a8f')
+                         '256acdac-2f05-4e3e-85a3-802055bf2863')
         self.assertNotEqual(obj[1]['alarm_definition'], None)
         self.assertNotEqual(obj[1]['metrics'], None)
-        self.assertEqual(obj[1]['state'], 'OK')
+        self.assertEqual(obj[1]['state'], 'UNDETERMINED')
         self.assertNotEqual(obj[1]['sub_alarms'], None)
-        self.assertEqual(obj[1]['created_timestamp'], '2015-06-17T19:43:21Z')
-        self.assertEqual(obj[1]['updated_timestamp'], '2015-06-17T19:43:27Z')
-        self.assertEqual(obj[1]['state_updated_timestamp'],
-                         '2015-06-17T19:43:27Z')
         self.assertEqual(len(obj), 2)
 
     def test_do_get_alarms_by_id(self):

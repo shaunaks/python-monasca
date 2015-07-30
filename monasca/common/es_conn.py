@@ -88,13 +88,13 @@ class ESConnection(object):
             LOG.debug('Msg posted with response code: %s' % res.status_code)
             return res.status_code
 
-    def get_messages(self, cond):
+    def get_messages(self, cond, q_string=""):
         LOG.debug('Prepare to get messages.')
         if cond:
             data = json.dumps(cond)
         else:
             data = {}
-        return requests.post(self.search_path, data=data)
+        return requests.post(self.search_path + "?" + q_string, data=data)
 
     def get_message_by_id(self, id):
         LOG.debug('Prepare to get messages by id.')
