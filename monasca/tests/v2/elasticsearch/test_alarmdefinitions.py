@@ -21,6 +21,8 @@ from oslo.config import fixture as fixture_config
 from oslotest import base
 import requests
 
+from monasca.common import alarm_expr_parser
+from monasca.common import alarm_expr_validator
 from monasca.common import es_conn
 from monasca.v2.elasticsearch import alarmdefinitions
 
@@ -230,3 +232,209 @@ class TestAlarmDefinitionDispatcher(base.BaseTestCase):
             self.dispatcher_delete.do_delete_alarm_definitions(
                 mock.Mock(), res, id="72df5ccb-ec6a-4bb4-a15c-939467ccdde0")
             self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
+
+    def test_do_delete_alarm_definitions_exception(self):
+        with mock.patch.object(es_conn.ESConnection, 'del_messages',
+                               return_value=0,
+                               side_effect=Exception('Exception')):
+            res = mock.Mock()
+            self.dispatcher_delete.do_delete_alarm_definitions(
+                mock.Mock(), res, id="72df5ccb-ec6a-4bb4-a15c-939467ccdde0")
+            self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))
+
+    def test_do_get_alarm_definitions_filtered_exception(self):
+        res = mock.Mock()
+        req = mock.Mock()
+        req_result = mock.Mock()
+
+        req_result.json.return_value = ''
+        req_result.status_code = 400
+        req.query_string = 'name=CPU usage test&dimensions=os:linux'
+        with mock.patch.object(es_conn.ESConnection, 'get_messages',
+                               return_value=req_result):
+            self.dispatcher_get.do_get_alarm_definitions_filtered(req, res)
+
+            # test that the response code is 400
+            self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))
+
+    def test_do_post_alarm_definitions_exception(self):
+        req = mock.Mock()
+        res = mock.Mock()
+        req_result = mock.Mock()
+        req_result.status_code = 201
+
+        with mock.patch.object(requests, 'post', return_value=req_result):
+            with mock.patch.object(req.stream, 'read',
+                                   return_value="{ 'name': 'CPU usage test', "
+                                                "'alarm_actions': "
+                                                "'c60ec47e-5038-4bf1-9f95-"
+                                                "4046c6e9a719', "
+                                                "'undetermined_actions': "
+                                                "'c60ec47e-5038-4bf1-9t95-"
+                                                "4046c6e9a759', 'ok_actions':"
+                                                " 'c60ec47e-5038-4bf1-9f95-"
+                                                "4046cte9a759', "
+                                                "'match_by': 'hostname', "
+                                                "'severity': 'LOW', "
+                                                "'expression': "
+                                                "'max(cpu.usage{os=linux},"
+                                                "600)"
+                                                ">15', 'description': "
+                                                "'Max CPU 15'"
+                                                "}"
+                                   ):
+                with mock.patch.object(alarm_expr_validator,
+                                       'is_valid_alarm_definition',
+                                       return_value=False):
+                    self.dispatcher_post.do_post_alarm_definitions(
+                        req, res)
+                    # test that the response code is 400
+                    self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))
+
+    def test_do_post_alarm_definitions_parse_exception(self):
+        req = mock.Mock()
+        res = mock.Mock()
+        req_result = mock.Mock()
+        req_result.status_code = 201
+
+        with mock.patch.object(requests, 'post', return_value=req_result):
+            with mock.patch.object(req.stream, 'read',
+                                   return_value="{ 'name': 'CPU usage test', "
+                                                "'alarm_actions': "
+                                                "'c60ec47e-5038-4bf1-9f95-"
+                                                "4046c6e9a719', "
+                                                "'undetermined_actions': "
+                                                "'c60ec47e-5038-4bf1-9t95-"
+                                                "4046c6e9a759', 'ok_actions':"
+                                                " 'c60ec47e-5038-4bf1-9f95-"
+                                                "4046cte9a759', "
+                                                "'match_by': 'hostname', "
+                                                "'severity': 'TEST', "
+                                                "'expression': "
+                                                "'max(cpu.usage{os=linux},"
+                                                "600)"
+                                                ">15', 'description': "
+                                                "'Max CPU 15'"
+                                                "}"
+                                   ):
+                with mock.patch.object(alarm_expr_validator,
+                                       'is_valid_alarm_definition',
+                                       return_value=True):
+                    with mock.patch.object(alarm_expr_parser,
+                                           'AlarmExprParser',
+                                           return_value=None,
+                                           side_effect=(Exception('Exc'
+                                                                  'eption'))):
+                        self.dispatcher_post.do_post_alarm_definitions(
+                            req, res)
+                        # test that the response code is 400
+                        self.assertEqual(res.status, getattr(falcon,
+                                                             'HTTP_400'))
+
+    def test_do_put_alarm_definitions_exception(self):
+        req = mock.Mock()
+        res = mock.Mock()
+        req_result = mock.Mock()
+        req_result.status_code = 400
+        req_get_result = mock.Mock()
+
+        req_get_result.json.return_value = self.data
+        req_get_result.status_code = 200
+
+        with mock.patch.object(requests, 'get', return_value=req_get_result):
+            with mock.patch.object(requests, 'put', return_value=req_result):
+                with mock.patch.object(
+                        req.stream, 'read',
+                        return_value="{ 'name': 'CPU usage test', "
+                                     ""
+                                     "'c60ec47e-5038-4bf1-9f95-"
+                                     "4046c6e9a719', "
+                                     "'undetermined_actions': "
+                                     "'c60ec47e-5038-4bf1-9t95-"
+                                     "4046c6e9a759', 'ok_actions':"
+                                     " 'c60ec47e-5038-4bf1-9f95-"
+                                     "4046cte9a759', "
+                                     "'match_by': 'hostname', "
+                                     "'severity': 'LOW', "
+                                     "'expression': "
+                                     "'max(cpu.usage{os=linux},"
+                                     "600)"
+                                     ">15', 'description': "
+                                     "'Max CPU 15'"
+                                     "}"
+                ):
+                    with mock.patch.object(alarm_expr_validator,
+                                           'is_valid_alarm_definition',
+                                           return_value=False):
+                        with mock.patch.object(
+                                alarm_expr_parser.AlarmExprParser,
+                                'sub_alarm_expressions', return_value=None,
+                                side_effect=(Exception('Exception'))):
+                            self.dispatcher_put.do_put_alarm_definitions(
+                                req, res,
+                                id="8c85be40-bfcb-465c-b450-4eea670806a6")
+                            # test that the response code is 400
+                            self.assertEqual(res.status, getattr(falcon,
+                                                                 'HTTP_400'))
+
+    def test_do_put_alarm_definitions_else_exception(self):
+        req = mock.Mock()
+        res = mock.Mock()
+        req_result = mock.Mock()
+        req_result.status_code = 400
+        req_get_result = mock.Mock()
+
+        req_get_result.json.return_value = self.data
+        req_get_result.status_code = 200
+
+        with mock.patch.object(requests, 'get', return_value=req_get_result):
+            with mock.patch.object(requests, 'put', return_value=req_result):
+                with mock.patch.object(
+                        req.stream, 'read',
+                        return_value="{ 'name': 'CPU usage test', "
+                                     "'alarm_actions': "
+                                     "'c60ec47e-5038-4bf1-9f95-"
+                                     "4046c6e9a719', "
+                                     "'undetermined_actions': "
+                                     "'c60ec47e-5038-4bf1-9t95-"
+                                     "4046c6e9a759', 'ok_actions':"
+                                     " 'c60ec47e-5038-4bf1-9f95-"
+                                     "4046cte9a759', "
+                                     "'match_by': 'hostname', "
+                                     "'severity': 'LOW', "
+                                     "'expression': "
+                                     "'max(cpu.usage{os=linux},"
+                                     "600)"
+                                     ">15', 'description': "
+                                     "'Max CPU 15'"
+                                     "}"
+                ):
+                    with mock.patch.object(alarm_expr_validator,
+                                           'is_valid_alarm_definition',
+                                           return_value=False):
+                        with mock.patch.object(
+                                alarm_expr_parser.AlarmExprParser,
+                                'sub_alarm_expressions', return_value=None,
+                                side_effect=(Exception('Exception'))):
+                            self.dispatcher_put.do_put_alarm_definitions(
+                                req, res,
+                                id="8c85be40-bfcb-465c-b450-4eea670806a6")
+                            # test that the response code is 400
+                            self.assertEqual(res.status, getattr(falcon,
+                                                                 'HTTP_400'))
+
+    def test_do_get_alarm_definitions_by_id_exception(self):
+        res = mock.Mock()
+        req = mock.Mock()
+        req_result = mock.Mock()
+
+        req_result.json.return_value = ''
+        req_result.status_code = 400
+
+        with mock.patch.object(es_conn.ESConnection, 'get_message_by_id',
+                               return_value=req_result):
+            self.dispatcher_get_by_id.do_get_alarm_definitions_by_id(
+                req, res, id="72df5ccb-ec6a-4bb4-a15c-939467ccdde0")
+
+            # test that the response code is 400
+            self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))

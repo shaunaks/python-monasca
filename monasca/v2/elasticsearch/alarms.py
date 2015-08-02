@@ -80,48 +80,6 @@ class AlarmDispatcher(object):
         else:
             return None
 
-    def _get_alarms_helper(self, query_string):
-        query = {}
-        queries = []
-        field_string = 'alarms.metrics.dimensions.'
-        if query_string:
-            params = query_string.split('&')
-            for current_param in params:
-                current_param_split = current_param.split('=')
-                if current_param_split[0] == 'metric_dimensions':
-                    current_dimension_split = (
-                        current_param_split[1].split(','))
-                    for current_dimension in current_dimension_split:
-                        current_dimen_data = current_dimension.split(':')
-                        queries.append({
-                            'query_string': {
-                                'default_field': (field_string +
-                                                  current_dimen_data[0]),
-                                'query': current_dimen_data[1]
-                            }
-                        })
-                elif current_param_split[0] in ['limit', 'offset']:
-                    # ignore these two parameter until we support pagination
-                    pass
-                else:
-                    queries.append({
-                        'query_string': {
-                            'default_field': current_param_split[0],
-                            'query': current_param_split[1]
-                        }
-                    })
-            LOG.debug(queries)
-            query = {
-                'query': {
-                    'bool': {
-                        'must': queries
-                    }
-                }
-            }
-
-        LOG.debug('Parsed Query: %s' % query)
-        return query
-
     @resource_api.Restify('/v2.0/alarms', method='get')
     def do_get_alarms(self, req, res):
         LOG.debug('The alarms GET request is received!')
@@ -220,6 +178,7 @@ class AlarmDispatcher(object):
             else:
                 res.body = ''
         except Exception:
+            res.status = getattr(falcon, 'HTTP_400')
             LOG.exception('Error occurred while handling Alarm '
                           'Get By ID Request.')
 
@@ -234,6 +193,7 @@ class AlarmDispatcher(object):
                       es_res)
             res.status = getattr(falcon, 'HTTP_%s' % es_res)
         except Exception:
+            res.status = getattr(falcon, 'HTTP_400')
             LOG.exception('Error occurred while handling Alarm Put Request.')
 
     @resource_api.Restify('/v2.0/alarms/{id}', method='delete')
@@ -245,5 +205,6 @@ class AlarmDispatcher(object):
                       es_res)
             res.status = getattr(falcon, 'HTTP_%s' % es_res)
         except Exception:
+            res.status = getattr(falcon, 'HTTP_400')
             LOG.exception('Error occurred while handling '
                           'Alarm Delete Request.')

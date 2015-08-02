@@ -185,3 +185,99 @@ class TestAlarmDispatcher(base.BaseTestCase):
             self.dispatcher_delete.do_delete_alarms(
                 mock.Mock(), res, id="d718fb26-d16d-4705-8f02-13a1468619c9")
             self.assertEqual(res.status, getattr(falcon, 'HTTP_200'))
+
+    def test_do_get_alarms_exception(self):
+        res = mock.Mock()
+        req = mock.Mock()
+        req_result = mock.Mock()
+
+        req_result.json.return_value = ''
+        req_result.status_code = 400
+
+        req.query_string = 'metric_dimensions=hostname:h7,os:linux&state=OK'
+        with mock.patch.object(es_conn.ESConnection, 'get_messages',
+                               return_value=req_result):
+            self.dispatcher_get.do_get_alarms(req, res)
+
+        # test that the response code is 400
+        self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))
+
+    def test_do_get_alarms_by_id_exception(self):
+        res = mock.Mock()
+        req = mock.Mock()
+
+        req_result = mock.Mock()
+
+        req_result.json.return_value = ''
+        req_result.status_code = 400
+
+        with mock.patch.object(es_conn.ESConnection, 'get_message_by_id',
+                               return_value=req_result):
+            self.dispatcher_get_by_id.do_get_alarms_by_id(
+                req, res, id="d718fb26-d16d-4705-8f02-13a1468619c9")
+
+        # test that the response code is 400
+        self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))
+
+    def test_do_put_alarms_exception(self):
+        req = mock.Mock()
+        res = mock.Mock()
+
+        req_result = ("{ 'id': 'd718fb26-d16d-4705-"
+                      "8f02-13a1468619c9', "
+                      "'links': ["
+                      "{"
+                      "'href': 'http://127.0.0.1:"
+                      "9090/v2.0/alarms/'"
+                      "'d718fb26-d16d-4705-8f02-"
+                      "13a1468619c9', "
+                      "'rel': 'self}], '"
+                      "'metrics': [{ "
+                      "'name': 'cpu.usage', "
+                      "'dimensions': { "
+                      "'hostname': "
+                      "'host7', 'os': 'linux' }}],"
+                      "'state': 'OK', "
+                      "'sub_alarms': [{"
+                      "'sub_alarm_expression': {"
+                      "'function': 'AVG', "
+                      "'metric_name': "
+                      "'cpu.usage', "
+                      "'period': '600', "
+                      "'threshold': '10', "
+                      "'periods': '1', "
+                      "'operator': 'LTE', "
+                      "'dimensions': {'os': "
+                      "'linux'}}, "
+                      ""
+                      "[10.0498869723], "
+                      "'sub_alarm_state': 'OK'}], "
+                      "'created_timestamp': "
+                      "'2015-06-17T16:43:21Z', "
+                      "'state_updated_timestamp': "
+                      "'2015-06-17T16:43:27Z'"
+                      "}")
+
+        json_result = json.dumps(req_result)
+
+        with mock.patch.object(es_conn.ESConnection, 'put_messages',
+                               return_value=400,
+                               side_effect=Exception('Exception')):
+            with mock.patch.object(req.stream, 'read',
+                                   return_value=json_result):
+                self.dispatcher_put.do_put_alarms(
+                    req, res, id="d718fb26-d16d-4705-8f02-13a1468619c9")
+
+                # test that the response code is 400
+                self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))
+
+    def test_do_delete_alarms_exception(self):
+        with mock.patch.object(es_conn.ESConnection, 'del_messages',
+                               return_value=400,
+                               side_effect=Exception('Exception')):
+            res = mock.Mock()
+            self.dispatcher_delete.do_delete_alarms(
+                mock.Mock(), res, id="d718fb26-d16d-4705-8f02-13a1468619c9")
+
+            # test that the response code is 400
+            self.assertEqual(res.status, getattr(falcon, 'HTTP_400'))
