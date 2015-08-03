@@ -275,6 +275,7 @@ class AlarmDefinitionDispatcher(object):
                 res.status = getattr(falcon, 'HTTP_400')
                 LOG.debug("Validating Alarm Definition Failed !!")
         except Exception:
+            res.status = getattr(falcon, 'HTTP_400')
             LOG.exception('Error occurred while handling Alarm '
                           'Definition Put Request.')
 
@@ -287,6 +288,7 @@ class AlarmDefinitionDispatcher(object):
                       es_res)
             res.status = getattr(falcon, 'HTTP_%s' % es_res)
         except Exception:
+            res.status = getattr(falcon, 'HTTP_400')
             LOG.exception('Error occurred while handling Alarm '
                           'Definition Delete Request.')
 
@@ -346,5 +348,6 @@ class AlarmDefinitionDispatcher(object):
                 res.body = ""
             res.content_type = 'application/json;charset=utf-8'
         except Exception:
+            res.status = getattr(falcon, 'HTTP_400')
             LOG.exception('Error occurred while handling Alarm '
                           'Definitions Get Request.')
